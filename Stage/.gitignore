@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+bin/
+*.o
+*.obj
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.map
+*.sbr
+
+# Temporary files
+*.tmp
+*~
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.sln
+
+# Qt-specific files (if applicable)
+*.ui.h
+moc_*
+ui_*
+
+# System files
+Thumbs.db
+.DS_Store
+
+#Other
+*.log
