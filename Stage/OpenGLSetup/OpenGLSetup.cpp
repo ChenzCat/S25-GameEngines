@@ -14,8 +14,8 @@ float red = 1, green = 1, blue = 1;
 float posX, posY, posZ = 0, speed = 0.1;
 
 // Message/text to be displayed
-const char* testText = "Insert text here! \n"
-					   "Isn't that cool!";
+const char* testText = "Wow! \n"
+					   "Text!";
 
 // Function to draw text
 void drawText(const char* text, float x, float y, float z, float lineSpace) { //im doing this becasue "\n" doesnt work for some reason?
