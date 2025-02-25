@@ -13,7 +13,13 @@ using namespace irrklang;
 
 int frame = 0;
 
-float speed = 0.05;
+float speed = 0.15, gravity = 0.2;
+
+float jumpHeight = 0.5, jumpForce = 0.3, jumpTimer = 10, resetJumpTimer;
+
+bool showGroundCheck = true;
+
+bool left, right, jump;
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
@@ -28,6 +34,17 @@ char* textureFileNames[5] = {	// File names for the files from which texture ima
 	(char*)"sprite/catWag4.png",
 };
 
+char* catMeows[8] = {
+	(char*)"audio/Cat 1.wav",
+	(char*)"audio/Cat 2.wav",
+	(char*)"audio/Cat 3.wav",
+	(char*)"audio/Cat 4.wav",
+	(char*)"audio/Cat 5.wav",
+	(char*)"audio/Cat 6.wav",
+	(char*)"audio/Cat 7.wav",
+	(char*)"audio/Cat 8.wav",
+};
+
 // Gameobject class
 class GameObject
 {
@@ -36,20 +53,25 @@ public:
 	GLfloat   x, y, z, sizeX, sizeY;
 	GLfloat   colorR, colorG, colorB;
 	GLfloat   mass;
+	bool	  canSee;
 	bool      isSolid;
 	bool      destroyed;
 	bool      gravity;
-	
+
 	GameObject();
 
 	void DrawGameObject(bool, GameObject);
+	void DrawPlayer(GameObject, bool);
 };
 
 // Gameobjects on the screen
-GameObject player, obsticle, collectible;
+GameObject player, groundCheck, ground, collectible;
 
 bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 {
+	if (one.destroyed || two.destroyed)
+		return false;
+
 	// collision x-axis?
 	bool collisionX = one.x + one.sizeX >= two.x && two.x + two.sizeX >= one.x;
 
@@ -68,61 +90,119 @@ void init(void) {
 	glLoadIdentity();
 	glOrtho(-5.0, 5.0, -5.0, 5.0, -10.0, 10.0);
 
-	obsticle.x = 3;
-	obsticle.colorG = 0;
+	resetJumpTimer = jumpTimer;
 
-	collectible.x = -3;
+	groundCheck.colorR = 0;
+
+	ground.x = -3.5;
+	ground.y = -3;
+	ground.sizeX = 7;
+	ground.colorG = 0;
+
+	collectible.x = -2;
+	collectible.y = -1;
+	collectible.sizeX = 0.5;
+	collectible.sizeY = 0.5;
 	collectible.colorB = 0;
 
-	SoundEngine->play2D("audio/Catsong.mp3", true);
+	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
+}
+
+void CreatePlayer(bool show) {
+	// Draw player sprite and ground check
+	glPushMatrix();
+	player.DrawPlayer(player, true);
+	groundCheck.x = player.x + 0.25;
+	groundCheck.y = player.y;
+	groundCheck.sizeX = 0.6;
+	groundCheck.sizeY = 0.2;
+
+	groundCheck.canSee = show;
+
+	groundCheck.DrawGameObject(false, groundCheck);
+	glPopMatrix();
 }
 
 void MyDisplay() {
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	// Draw player sprite
-	glPushMatrix();
-	player.DrawGameObject(true, player);
-	glPopMatrix();
+	// Makes the player
+	CreatePlayer(showGroundCheck);
 
-	glPushMatrix();
-	obsticle.DrawGameObject(false, obsticle);
-	glPopMatrix();
+	// Makes the ground
+	ground.DrawGameObject(false, ground);
 
-	glPushMatrix();
+	// Makes the collectible
 	collectible.DrawGameObject(false, collectible);
-	glPopMatrix();
 
 	// Removes the collectible
 	if (CheckCollision(player, collectible))
 		collectible.destroyed = true;
 
+	// Check if player is on the ground
+	if (!CheckCollision(groundCheck, ground) && !jump)
+		player.y -= gravity;
+
+	// Check if player is hitting the ground but ground checker is not
+	if (CheckCollision(player, ground) && !CheckCollision(groundCheck, ground) && !jump)
+		left = right = false;
+
+	//Movement
+	if(left)
+		player.x -= speed;
+	if(right)
+		player.x += speed;
+
 	glFlush();
 	glutSwapBuffers();
 }
 
-void Keyboard(int key, int x, int y) {
+void specialKeyboard(int key, int x, int y) {
 
-	if (key == GLUT_KEY_UP) {
-		player.y += speed;
-			if (CheckCollision(player, obsticle))
-				player.y -= speed;
+	switch (key) {
+		case GLUT_KEY_LEFT:
+			left = true;
+			right = false;
+			break;
+		case GLUT_KEY_RIGHT:
+			left = false;
+			right = true;
+			break;
 	}
-	if (key == GLUT_KEY_DOWN) {
-			player.y -= speed;
-			if (CheckCollision(player, obsticle))
-				player.y += speed;
+
+	glutPostRedisplay();
+}
+
+void specialKeyboardRelease(int key, int x, int y) {
+
+	switch (key) {
+		case GLUT_KEY_LEFT:
+			left = false;
+			break;
+		case GLUT_KEY_RIGHT:
+			right = false;
+			break;
 	}
-	if (key == GLUT_KEY_LEFT) {
-			player.x -= speed;
-			if (CheckCollision(player, obsticle))
-				player.x += speed;
+}
+
+void Keyboard(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+	case 's': // Show ground check
+		showGroundCheck = !showGroundCheck;
+		break;
+	case 32: // Spacebar
+		if (CheckCollision(groundCheck, ground) && !jump) {
+			SoundEngine->play2D(catMeows[rand() % 7], false);
+			jump = true;
+		}
+		break;
+	case 27: // escape
+		exit(0);
 	}
-	if (key == GLUT_KEY_RIGHT) {
-			player.x += speed;
-			if (CheckCollision(player, obsticle))
-				player.x -= speed;
-	}
+
+	glutPostRedisplay();
 }
 
 void loadTextures() {
@@ -170,6 +250,17 @@ void timer(int v)
 		frame = 0;
 	}
 
+	// jump timer
+	if (jump) {
+		jumpTimer -= 1;
+		player.y += jumpForce;
+
+		if (jumpTimer <= 0) {
+			jumpTimer = resetJumpTimer;
+			jump = false;
+		}
+	}
+
 	glutPostRedisplay();
 	glutTimerFunc(100, timer, v); // Creates a frame delay that is counted in miliseconds
 }
@@ -179,7 +270,7 @@ int main(int argc, char** argv) {
 	glutInitDisplayMode(GLUT_RGB); // RGB mode
 	glutInitWindowSize(WIN_W, WIN_H); // window size
 	glutInitWindowPosition(WIN_X, WIN_Y);
-	glutCreateWindow("Collision Example");
+	glutCreateWindow("Gravity Example");
 
 	glutTimerFunc(0, timer, 0);
 
@@ -189,7 +280,9 @@ int main(int argc, char** argv) {
 
 	glutDisplayFunc(MyDisplay); // call the drawing function
 
-	glutSpecialFunc(Keyboard);
+	glutKeyboardFunc(Keyboard);
+	glutSpecialFunc(specialKeyboard);
+	glutSpecialUpFunc(specialKeyboardRelease);
 
 	glutMainLoop();
 	return 0;
@@ -200,6 +293,7 @@ GameObject::GameObject() {
 	sizeX = sizeY = 1;
 	colorR = colorG = colorB = 1;
 	mass = 0;
+	canSee = true;
 	isSolid = false;
 	destroyed = false;
 	gravity = false;
@@ -210,7 +304,7 @@ void GameObject::DrawGameObject(bool sprite, GameObject parameters)
 	glPushMatrix();
 	glTranslatef(parameters.x, parameters.y, parameters.z);
 
-	if (!parameters.destroyed)
+	if (parameters.canSee && !parameters.destroyed)
 	{
 		if (sprite)
 		{
@@ -222,13 +316,13 @@ void GameObject::DrawGameObject(bool sprite, GameObject parameters)
 
 			glBegin(GL_POLYGON);
 			glTexCoord2f(0.0, 0.0);
-			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(-0.5+ parameters.sizeX-1, -0.5, 0);
 			glTexCoord2f(1.0, 0.0);
-			glVertex3f(0.5, -0.5, 0);
+			glVertex3f(0.5 + parameters.sizeX - 1, -0.5, 0);
 			glTexCoord2f(1.0, 1.0);
-			glVertex3f(0.5, 0.5, 0);
+			glVertex3f(0.5 + parameters.sizeX - 1, 0.5 + parameters.sizeY - 1, 0);
 			glTexCoord2f(0.0, 1.0);
-			glVertex3f(-0.5, 0.5, 0);
+			glVertex3f(-0.5, 0.5 + parameters.sizeY - 1, 0);
 			glEnd();
 
 			glDisable(GL_TEXTURE_2D); // Turn texturing off
@@ -239,13 +333,57 @@ void GameObject::DrawGameObject(bool sprite, GameObject parameters)
 
 			glBegin(GL_POLYGON);
 			glVertex3f(-0.5, -0.5, 0);
-			glVertex3f(0.5, -0.5, 0);
-			glVertex3f(0.5, 0.5, 0);
-			glVertex3f(-0.5, 0.5, 0);
+			glVertex3f(0.5 + parameters.sizeX-1, -0.5, 0);
+			glVertex3f(0.5 + parameters.sizeX-1, 0.5 + parameters.sizeY-1, 0);
+			glVertex3f(-0.5, 0.5 + parameters.sizeY-1, 0);
 			glEnd();
 		}
-
-		glPopMatrix();
 	}
+	glPopMatrix();
+}
+
+void GameObject::DrawPlayer(GameObject player, bool sprite)
+{
+	glPushMatrix();
+	glTranslatef(player.x, player.y, player.z);
+
+	if (player.canSee && !player.destroyed)
+	{
+		//Draw Player
+		if (sprite)
+		{
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(-0.5 + player.sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(0.5 + player.sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(0.5 + player.sizeX - 1, 0.5 + player.sizeY - 1, 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(-0.5, 0.5 + player.sizeY - 1, 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+		else
+		{
+			glColor3f(player.colorR, player.colorG, player.colorB);
+
+			glBegin(GL_POLYGON);
+			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(0.5 + player.sizeX - 1, -0.5, 0);
+			glVertex3f(0.5 + player.sizeX - 1, 0.5 + player.sizeY - 1, 0);
+			glVertex3f(-0.5, 0.5 + player.sizeY - 1, 0);
+			glEnd();
+		}
+	}
+
+	glPopMatrix();
 }
 
