@@ -15,7 +15,7 @@ int frame = 0;
 
 float speed = 0.15, gravity = 0.2;
 
-float jumpHeight = 0.5, jumpForce = 0.3, jumpTimer = 10, resetJumpTimer;
+float jumpHeight = 0.5, jumpForce = 0.3, jumpTimer = 5, resetJumpTimer;
 
 bool showGroundCheck = true;
 
@@ -57,7 +57,7 @@ public:
 	bool      isSolid;
 	bool      destroyed;
 	bool      gravity;
-
+	
 	GameObject();
 
 	void DrawGameObject(bool, GameObject);
@@ -246,7 +246,7 @@ void timer(int v)
 {
 	frame++;
 
-	if (frame >= 4) {
+	if (frame >= 1) { // set to 1 to stop it. Normally 4
 		frame = 0;
 	}
 
