@@ -1,470 +1,488 @@
-// Computer Graphics  | Project 1: Sprite Cube
-// Vincenzo Cavallaro | Professor Meldin Bektic
-// Feb 11, 2025
-
 #include <GL/glut.h>
 #include <GL/freeglut.h>
 #include <FreeImage/FreeImage.h>
 #include <stdio.h>
 #include <math.h>
-#include <string>
-#include <IrrKlang/irrKlang.h>
+#include <array>
 #include <iostream>
-
+#include <IrrKlang/irrKlang.h>
 using namespace irrklang;
 using namespace std;
 
-// Global toggles and states
-bool solid = true;                  // Solid
-bool wireframe = false;             // Wireframe
-bool bonusMode = false;             // Simple Logo
-bool extras = true;                 // Square and Triangle
-bool colorSwap = false;             // Swap Triangle and Square Colors
-bool displayOn = true;              // Toggle Entire Screen
-bool axis = false;                  // Bicolored Axis
+#define WIN_X 100
+#define WIN_Y 100
+#define WIN_H 600
+#define WIN_W 600
+//-------------------------------------------------------------------------------------------------------------
 
-// Custom Colors (Extra Feature)
-float r = 1.0, g = 1.0, b = 1.0;
+int frame = 0, groundNum = 2;
+float camX = 0.0f, camY = 0.0f;
 
-// Global Movement for the cube
-float squareX = 0.0f, squareY = 0.0f, speed = 1.0f; // Global for square movement.
-float zoomFactor = 1.0f;
 
-// Physics globals for gravity
-float velocityY = 0.0f;             // Vertical velocity for gravity
-const float gravity = -0.005f;      // Gravity acceleration (negative = downward)
-const float cubeHalfHeight = 0.1f;    // Half-height of the cube (since width/height=10/100 = 0.1)
-const float floorY = -0.9f;         // Y coordinate of the floor
+
+float speed = 0.15, gravity = 1;
+float gravityVelocity = 0.0f;
+float gravityAcceleration = 0.1f; // Acceleration due to gravity
+float maxFallSpeed = 2.0f;  // Cap maximum fall speed
+
+float jumpTimer = 10, resetJumpTimer;
+float jumpAcceleration = 1.0f; // Adjust this value for jump height
+float jumpVelocity = 2.5f; // Adjust this value for initial jump velocity
+
+bool showCollision = true;
+
+bool lt, rt, jump, contact, onGround;
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
-const char* audioTracks[3] = { "audio/TheBottom.mp3", "audio/ThePrison.mp3", "audio/ClockwiseOperetta.mp3" };
-int currentTrack = 0;
-bool audio = false;
 
-// Textures
-int frame = 0;
-int frameDelay = 100; // in milliseconds
+GLuint texID[5]; // Texture ID's for the four textures.
 
-GLuint texID[4];  // Number of Textures
-
-char* textureFileNames[4] =
-{
-    (char*)"sprite/coffee0.png",
-    (char*)"sprite/coffee1.png",
-    (char*)"sprite/coffee2.png",
-    (char*)"sprite/coffee3.png",
+char* textureFileNames[4] = {	// File names for the files from which texture images are loaded
+	(char*)"sprite/coffee0.png",
+	(char*)"sprite/coffee1.png",
+	(char*)"sprite/coffee2.png",
+	(char*)"sprite/coffee3.png",
 };
 
-// Draw Axis
-void drawAxis()
-{
-    glPushMatrix();
-    // X-axis (Red)
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glBegin(GL_LINES);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(1.0f, 0.0f, 0.0f);
-    glEnd();
+char* catMeows[1] = {
+	(char*)"audio/Cat 1.wav",
 
-    // Y-axis (Green)
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glBegin(GL_LINES);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 1.0f, 0.0f);
-    glEnd();
-    glPopMatrix();
+};
+
+// Gameobject class
+class GameObject
+{
+public:
+	// object state
+	GLfloat   x, y, z, sizeX, sizeY;
+	GLfloat   colorR, colorG, colorB;
+	GLfloat   mass;
+	bool	  canSee;
+	bool      isSolid;
+	bool      destroyed;
+	bool      gravity;
+
+	GameObject();
+
+	void DrawGameObject(bool);
+	void DrawPlayer(bool);
+};
+
+// Gameobjects on the screen
+GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
+
+bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
+{
+	if (one.destroyed || two.destroyed)
+		return false;
+
+	// collision x-axis?
+	bool collisionX = one.x + one.sizeX >= two.x && two.x + two.sizeX >= one.x;
+
+	// collision y-axis?
+	bool collisionY = one.y + one.sizeY >= two.y && two.y + two.sizeY >= one.y;
+
+
+	// collision only if on both axes
+	return collisionX && collisionY;
 }
 
-// Primitive Functions (Cube, Triangle)
-void drawSquare(float width, float height, float renderType)
-{
-    glBegin(renderType);
-    glVertex3f(-width / 100, -height / 100, 0);
-    glVertex3f(width / 100, -height / 100, 0);
-    glVertex3f(width / 100, height / 100, 0);
-    glVertex3f(-width / 100, height / 100, 0);
-    glEnd();
-}
+void updateCamera() {
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
 
-void drawTriangle(float width, float height, float renderType)
-{
-    glBegin(renderType);
-    glVertex3f(-width / 100, -height / 100, 0);
-    glVertex3f(width / 100, -height / 100, 0);
-    glVertex3f(0, height / 100, 0);
-    glEnd();
-}
+	// Set the camera to always center on the player's position
+	glOrtho(player.x - 7.0, player.x + 7.0, player.y - 7.0, player.y + 7.0, -10.0, 10.0);
 
-// BonusShapes
-void drawLetterV(float width, float height, float renderType, float red, float green, float blue)
-{
-    glColor3f(red, green, blue);
-    glBegin(renderType);
-    // Left leg of the V
-    glVertex3f(-width / 100, height / 100, 0);
-    glVertex3f(0.0f, -height / 100, 0);
-    // Right leg of the V
-    glVertex3f(width / 100, height / 100, 0);
-    glVertex3f(0.0f, -height / 100, 0);
-    glEnd();
-}
-
-void drawWitchHat(float width, float height, float renderType, float red, float green, float blue)
-{
-    glColor3f(red, green, blue); // Cone (fancy triangle)
-    glBegin(renderType);
-    glVertex3f(-width / 100, -height / 100, -1);
-    glVertex3f(width / 100, -height / 100, -1);
-    glVertex3f(0, height / 100, -1);
-    glEnd();
-
-    glColor3f(red / 2, green / 2, blue / 2); // Brim
-    glBegin(renderType);
-    glVertex3f((-width + 1) / 100, -height / 100, 0);
-    glVertex3f((width + 1) / 100, -height / 100, 0);
-    glVertex3f(width / 50, -height / 80, 0);
-    glVertex3f(-width / 50, -height / 80, 0);
-    glEnd();
-}
-
-void drawLines(float width, float height, float renderType)
-{
-    for (int i = 0; i < 4; i++) {
-        if (i == 0) glColor3f(0.0f, 0.5f, 1.0f);
-        if (i == 1) glColor3f(0.0f, 1.0f, 0.0f);
-        if (i == 2) glColor3f(1.0f, 1.0f, 0.0f);
-        if (i == 3) glColor3f(1.0f, 0.0f, 0.0f);
-
-        glBegin(renderType);
-        glVertex3f(-width * (i + 0.5f) / 140, (height - 1) / 200.0f * i, 0);
-        glVertex3f(width * (i + 0.5f) / 140, (height + 1) / 200.0f * i, 0);
-        glEnd();
-    }
-}
-
-// Textured Shape (Cube with coffee texture)
-void drawCoffee(float width, float height, float renderType)
-{
-    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, texID[frame]);
-
-    glColor3f(r, g, b);
-
-    glBegin(renderType);
-    glTexCoord2f(0.0, 0.0);
-    glVertex3f(-width / 100, -height / 100, 0);
-    glTexCoord2f(1.0, 0.0);
-    glVertex3f(width / 100, -height / 100, 0);
-    glTexCoord2f(1.0, 1.0);
-    glVertex3f(width / 100, height / 100, 0);
-    glTexCoord2f(0.0, 1.0);
-    glVertex3f(-width / 100, height / 100, 0);
-    glEnd();
-    glDisable(GL_TEXTURE_2D);
-}
-
-// Required Functions (Color Swapping Shapes)
-void drawSpecialItems()
-{
-    glPushMatrix();
-    if (!colorSwap)
-        glColor3f(0.8f, 0.1f, 0.1f);
-    else
-        glColor3f(0.1f, 0.8f, 0.1f);
-    glTranslatef(0.5f, 0.0f, 0.0f);
-    drawSquare(10, 10, GL_POLYGON);
-    glPopMatrix();
-
-    glPushMatrix();
-    if (!colorSwap)
-        glColor3f(0.1f, 0.8f, 0.1f);
-    else
-        glColor3f(0.8f, 0.1f, 0.1f);
-    glTranslatef(-0.5f, 0.0f, 0.0f);
-    drawTriangle(10, 10, GL_POLYGON);
-    glPopMatrix();
-}
-
-// Bonus Object (Simple logo)
-void drawBonusLogo()
-{
-    glPushMatrix();
-    glLineWidth(4.0f);
-    glTranslatef(0.80f, -0.88f, 0.0f);
-    glRotatef(10.0f, 0.0f, 0.0f, 1.0f);
-    drawLetterV(2.4f, 2.4f, GL_LINES, 0.8f, 0.8f, 0.1f);
-    glLineWidth(1.0f);
-    glPopMatrix();
-
-    glPushMatrix();
-    glLineWidth(2.0f);
-    glTranslatef(0.91f, -0.975f, -0.1f);
-    drawLines(6.0f, 3.0f, GL_LINES);
-    glLineWidth(1.0f);
-    glPopMatrix();
-
-    glPushMatrix();
-    glTranslatef(0.9f, -0.8f, 0.0f);
-    glRotatef(8.0f, 0.0f, 0.0f, 1.0f);
-    drawWitchHat(10.0f, 10.0f, GL_POLYGON, 0.0f, 0.0f, 1.0f);
-    glPopMatrix();
-}
-
-// Draw a simple floor as a rectangle that serves as a collider.
-void drawFloor() {
-    glColor3f(0.3f, 0.3f, 0.3f); // Dark grey
-    glBegin(GL_POLYGON);
-    glVertex3f(-1.0f, floorY, 0);
-    glVertex3f(1.0f, floorY, 0);
-    glVertex3f(1.0f, floorY - 0.05f, 0);
-    glVertex3f(-1.0f, floorY - 0.05f, 0);
-    glEnd();
+	glMatrixMode(GL_MODELVIEW);
 }
 
 void init(void) {
-    glClearColor(0.0, 0.0, 0.0, 1.0); // Clear the window screen
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-1, 1, -1, 1, -1, 1);
+
+	glClearColor(0.5f, 0.5f, 0.5f, 1.0f); // clear the window screen and change the background color
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-7.0, 7.0, -7.0, 7.0, -10.0, 10.0);
+
+	resetJumpTimer = jumpTimer;
+
+	bottomCheck.colorR = 0;
+	leftCheck.colorR = 0;
+	rightCheck.colorR = 0;
+	topCheck.colorR = 0;
+
+	ground[0].x = -3.5;
+	ground[0].y = -3;
+	ground[0].sizeX = 34;
+	ground[0].colorG = 1;
+
+	ground[1].x = 3.5;
+	ground[1].y = -3;
+	ground[1].sizeX = 3;
+	ground[1].colorG = 0;
+
+	ground[2].x = -5.5;
+	ground[2].y = -1;
+	ground[2].sizeX = 3;
+	ground[2].colorG = 0;
+
+	collectible.x = -4;
+	collectible.y = -2;
+	collectible.sizeX = 0.6;
+	collectible.sizeY = 0.7;
+	collectible.colorB = 0;
+
+	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
+}
+
+void CreatePlayer(bool show) {
+	// Draw player sprite and ground check
+	glPushMatrix();
+	player.DrawPlayer(true);
+	bottomCheck.x = player.x + 0.2;
+	bottomCheck.y = player.y;
+	bottomCheck.sizeX = 0.6;
+	bottomCheck.sizeY = 0.2;
+
+	bottomCheck.canSee = show;
+
+	leftCheck.x = player.x;
+	leftCheck.y = player.y + 0.2;
+	leftCheck.sizeX = 0.2;
+	leftCheck.sizeY = 0.6;
+
+	leftCheck.canSee = show;
+
+	rightCheck.x = player.x + 0.8;
+	rightCheck.y = player.y + 0.2;
+	rightCheck.sizeX = 0.2;
+	rightCheck.sizeY = 0.6;
+
+	rightCheck.canSee = show;
+
+	topCheck.x = player.x + 0.2;
+	topCheck.y = player.y + 0.8;
+	topCheck.sizeX = 0.6;
+	topCheck.sizeY = 0.2;
+
+	topCheck.canSee = show;
+
+	bottomCheck.DrawGameObject(false);
+	leftCheck.DrawGameObject(false);
+	rightCheck.DrawGameObject(false);
+	topCheck.DrawGameObject(false);
+	glPopMatrix();
+}
+
+void gravityCheck() {
+	onGround = false;
+
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(bottomCheck, ground[i])) {
+			onGround = true;
+			break;
+		}
+	}
+
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(leftCheck, ground[i])) {
+			player.x += speed;
+			break;
+		}
+	}
+
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(rightCheck, ground[i])) {
+			player.x -= speed;
+			break;
+		}
+	}
+
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(topCheck, ground[i]) && jump) {
+			jump = false;
+			jumpTimer = resetJumpTimer;
+			break;
+		}
+	}
+	
+	if (!onGround) {
+		gravityVelocity -= gravityAcceleration; // Gravity pulls down
+		if (gravityVelocity < -maxFallSpeed) gravityVelocity = -maxFallSpeed; // Cap fall speed
+		player.y += gravityVelocity; // Apply velocity
+	}
+	else {
+		gravityVelocity = 0; // Reset velocity when on ground
+	}
 }
 
 void MyDisplay() {
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glOrtho(-1.0 / zoomFactor, 1.0 / zoomFactor, -1.0 / zoomFactor, 1.0 / zoomFactor, -1, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT);
+	updateCamera();
+	// Makes the player
+	CreatePlayer(showCollision);
 
-    // Draw the floor first
-    if (displayOn)
-        drawFloor();
+	// Makes the ground
+	ground[0].DrawGameObject(false);
+	//ground[1].DrawGameObject(false);
+	//ground[2].DrawGameObject(false);
 
-    // Draw the moving cube (using coffee texture) with gravity applied
-    glPushMatrix();
-    glTranslatef(squareX, squareY, 0.0f);
-    if (solid && !wireframe && displayOn)
-        drawCoffee(10, 10, GL_POLYGON);
-    else if (wireframe && !solid && displayOn) {
-        glColor3f(r, g, b);
-        drawSquare(10, 10, GL_LINE_LOOP);
-    }
-    glPopMatrix();
+	// Makes the collectible
+	collectible.DrawGameObject(false);
 
-    // Bonus and extra items
-    if (bonusMode && displayOn)
-        drawBonusLogo();
-    if (axis && displayOn) {
-        glPushMatrix();
-        drawAxis();
-        glPopMatrix();
-    }
-    if (extras && displayOn) {
-        glPushMatrix();
-        drawSpecialItems();
-        glPopMatrix();
-    }
+	// Removes the collectible
+	if (CheckCollision(player, collectible))
+		collectible.destroyed = true;
 
-    glFlush();
-    glutSwapBuffers();
+	gravityCheck();
+
+	//Movement
+	if (lt)
+		player.x -= speed;
+	if (rt)
+		player.x += speed;
+
+	glFlush();
+	glutSwapBuffers();
+}
+
+void specialKeyboard(int key, int x, int y) {
+
+	switch (key) {
+	case GLUT_KEY_LEFT:
+		lt = true;
+		rt = false;
+		camX += 0.05f * speed;
+		break;
+	case GLUT_KEY_RIGHT:
+		lt = false;
+		rt = true;
+		camX -= 0.05f * speed;
+		break;
+		glOrtho(-1,1, -1, 1, -1, 1);
+		glTranslatef(camX, camY, 0);
+	}
+
+	glutPostRedisplay();
+}
+
+void specialKeyboardRelease(int key, int x, int y) {
+
+	switch (key) {
+	case GLUT_KEY_LEFT:
+		lt = false;
+		break;
+	case GLUT_KEY_RIGHT:
+		rt = false;
+		break;
+	}
+}
+
+void Keyboard(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+	case 's': // Show ground check
+		showCollision = !showCollision;
+		break;
+	case 32: // Spacebar
+		if (onGround && !jump) {
+			SoundEngine->play2D(catMeows[1], false);
+			jump = true;
+		}
+		break;
+	case 27: // escape
+		exit(0);
+	}
+
+	glutPostRedisplay();
 }
 
 void loadTextures() {
-    int i;
-    glGenTextures(4, texID); // Get the texture object IDs.
-    for (i = 0; i < 4; i++)
-    {
-        void* imgData; // Pointer to image color data read from the file.
-        int imgWidth;  // Image width.
-        int imgHeight; // Image height.
-        FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
-        if (format == FIF_UNKNOWN) {
-            printf("Unknown file type for texture image file %s\n", textureFileNames[i]);
-            continue;
-        }
-        FIBITMAP* bitmap = FreeImage_Load(format, textureFileNames[i], 0);
-        if (!bitmap) {
-            printf("Failed to load image %s\n", textureFileNames[i]);
-            continue;
-        }
-        FIBITMAP* bitmap2 = FreeImage_ConvertTo24Bits(bitmap);
-        FreeImage_Unload(bitmap);
-        imgData = FreeImage_GetBits(bitmap2);
-        imgWidth = FreeImage_GetWidth(bitmap2);
-        imgHeight = FreeImage_GetHeight(bitmap2);
-        if (imgData) {
-            printf("Texture image loaded from file %s, size %dx%d\n",
-                textureFileNames[i], imgWidth, imgHeight);
-            glBindTexture(GL_TEXTURE_2D, texID[i]);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_BGR_EXT,
-                GL_UNSIGNED_BYTE, imgData);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-        }
-        else {
-            printf("Failed to get texture data from %s\n", textureFileNames[i]);
-        }
-    }
+	int i;
+	glGenTextures(4, texID); // Get the texture object IDs.
+	for (i = 0; i < 4; i++) {
+		// Load image with FreeImage
+		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
+		if (format == FIF_UNKNOWN) {
+			printf("Unknown file type for texture image file %s\n", textureFileNames[i]);
+			continue;
+		}
+		FIBITMAP* bitmap = FreeImage_Load(format, textureFileNames[i], PNG_DEFAULT); // Load PNG files
+		if (!bitmap) {
+			printf("Failed to load image %s\n", textureFileNames[i]);
+			continue;
+		}
+		FIBITMAP* bitmap32 = FreeImage_ConvertTo32Bits(bitmap); // Convert to 32-bit (with alpha channel)
+		FreeImage_Unload(bitmap);
+		if (bitmap32) {
+			BYTE* bits = FreeImage_GetBits(bitmap32);
+			int width = FreeImage_GetWidth(bitmap32);
+			int height = FreeImage_GetHeight(bitmap32);
+			for (int j = 0; j < width * height; j++) {
+				BYTE temp = bits[j * 4];
+				bits[j * 4] = bits[j * 4 + 2];
+				bits[j * 4 + 2] = temp;
+			}
+
+			glBindTexture(GL_TEXTURE_2D, texID[i]); // Bind texture
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bits);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			FreeImage_Unload(bitmap32);
+		}
+	}
+	glEnable(GL_BLEND); // Enable blending
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set blending function
 }
 
 void timer(int v)
 {
-    // Animation frame update
-    frame = (frame + 1) % 4;
+	frame++;
 
-    // Physics update: Apply gravity and update vertical position.
-    // Convert frameDelay (ms) to seconds.
-    float dt = frameDelay / 1000.0f;
-    velocityY += gravity * dt;      // Update vertical velocity by gravity
-    squareY += velocityY * dt;      // Update vertical position
+	if (frame >= 4) {
+		frame = 0;
+	}
 
-    // Floor collision: if the bottom of the cube (squareY - cubeHalfHeight) goes below floorY, clamp it.
-    if (squareY - cubeHalfHeight < floorY) {
-        squareY = floorY + cubeHalfHeight;
-        velocityY = 0;
-    }
+	// jump timer
+	if (jump) {
+		if (jumpTimer > 0) {
+			float jumpAccelerationTemp = jumpAcceleration;
+			float jumpVelocityTemp = jumpVelocity;
+			player.y += jumpVelocityTemp; // Increment player's y-coordinate based on velocity
+			jumpVelocityTemp -= jumpAccelerationTemp; // Apply gravity to decrease velocity
+			jumpTimer--;
+		}
+		else {
+			jump = false;
+			jumpTimer = resetJumpTimer;
+		}
+	}
 
-    glutPostRedisplay();
-    glutTimerFunc(frameDelay, timer, 0); // Frame delay in milliseconds
-}
-
-void procSpecialKeys(int key, int x, int y)
-{
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    if (key == GLUT_KEY_LEFT)
-        squareX -= 0.1 * speed;
-    if (key == GLUT_KEY_RIGHT)
-        squareX += 0.1 * speed;
-    if (key == GLUT_KEY_UP)
-        squareY += 0.1 * speed; // Manual upward movement (in addition to gravity)
-    if (key == GLUT_KEY_DOWN)
-        squareY -= 0.1 * speed;
-    glOrtho(-1 / zoomFactor, 1 / zoomFactor, -1 / zoomFactor, 1 / zoomFactor, -1, 1);
-}
-
-void normalKeys(unsigned char key, int x, int y)
-{
-    float movementConstant = 0.3;
-    switch (key)
-    {
-    case '1': // Mode Toggle
-        wireframe = !wireframe;
-        solid = !solid;
-        break;
-    case '2': // Slow down animation
-        frameDelay += 50;
-        if (frameDelay > 500) frameDelay = 500;
-        break;
-    case '3': // Speed up animation
-        frameDelay -= 50;
-        if (frameDelay < 50) frameDelay = 50;
-        break;
-    case '4': // Bonus Toggle
-        bonusMode = !bonusMode;
-        break;
-    case 'a': // Axis Toggle 
-        axis = !axis;
-        break;
-    case 'c': // Disable Display
-        displayOn = false;
-        break;
-    case 'm': // Enable Display
-        displayOn = true;
-        break;
-    case 'p': // Toggle audio
-        audio = !audio;
-        if (audio)
-            SoundEngine->play2D(audioTracks[currentTrack], true);
-        else
-            SoundEngine->stopAllSounds();
-        break;
-        // Bonus color adjustments
-    case 'r': r = r - 0.1; break;
-    case 'g': g = g - 0.1; break;
-    case 'b': b = b - 0.1; break;
-    case 't': r = r + 0.1; break;
-    case 'h': g = g + 0.1; break;
-    case 'n': b = b + 0.1; break;
-    case 27: // ESC key to exit
-        exit(0);
-    }
-}
-
-void procMouse(int button, int state, int x, int y)
-{
-    // Handle Zoom
-    if (button == 4 && state == GLUT_UP) { // Zoom Out
-        zoomFactor -= 0.1;
-        if (zoomFactor < 0.5) zoomFactor = 0.5;
-    }
-    else if (button == 3 && state == GLUT_UP) { // Zoom In
-        zoomFactor += 0.1;
-        if (zoomFactor > 10.0) zoomFactor = 10.0;
-    }
-    // Update Projection Matrix
-    if (button == 4 || button == 3) {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(-1 / zoomFactor, 1 / zoomFactor, -1 / zoomFactor, 1 / zoomFactor, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-    }
-    // Music change + Color Swap
-    if (state == GLUT_DOWN) {
-        if (button == GLUT_RIGHT_BUTTON && audio) {
-            currentTrack = (currentTrack + 1) % 3;
-            SoundEngine->stopAllSounds();
-            SoundEngine->play2D(audioTracks[currentTrack], true);
-        }
-        else if (button == GLUT_LEFT_BUTTON) {
-            colorSwap = !colorSwap;
-        }
-    }
+	glutPostRedisplay();
+	glutTimerFunc(100, timer, v); // Adjust frame delay based on FPS
 }
 
 int main(int argc, char** argv) {
-    glutInit(&argc, argv);
-    // Updated to use double buffering along with RGB mode.
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-    glutInitWindowSize(700, 700);
-    glutInitWindowPosition(100, 100);
-    glutCreateWindow("V Cavallaro | 811097945");
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB); // RGB mode
+	glutInitWindowSize(WIN_W, WIN_H); // window size
+	glutInitWindowPosition(WIN_X, WIN_Y);
+	glutCreateWindow("Platform Example");
 
-    glutTimerFunc(0, timer, 0);
+	glutTimerFunc(0, timer, 0);
 
-    init();
-    loadTextures();
+	init();
 
-    // Callbacks
-    glutDisplayFunc(MyDisplay);
-    glutSpecialFunc(procSpecialKeys);
-    glutMouseFunc(procMouse);
-    glutKeyboardFunc(normalKeys);
+	loadTextures();
 
-    // Print controls to terminal
-    std::cout << std::endl;
-    std::cout << "Controls:\n";
-    std::cout << "Arrow Keys: Move the player\n";
-    std::cout << "'a': Toggle axis\n";
-    std::cout << "'c': Clear screen\n";
-    std::cout << "'m': Show screen\n";
-    std::cout << "'p': Toggle audio\n";
-    std::cout << "Left-click: Swap Red/Green colors\n";
-    std::cout << "Right-click: Cycle audio (if playing)\n";
-    std::cout << "Mouse Scroll: Zoom in/out\n";
-    std::cout << "ESC: Exit\n\n";
-    std::cout << "Bonus Features:\n";
-    std::cout << "'1': Toggle wireframe/solid\n";
-    std::cout << "'2': Slow down animation\n";
-    std::cout << "'3': Speed Up animation\n";
-    std::cout << "'4': Toggle Bonus Logo/solid\n\n";
-    std::cout << "'r': Reduce Wireframe Red\n";
-    std::cout << "'g': Reduce Wireframe Green\n";
-    std::cout << "'b': Reduce Wireframe Blue\n";
-    std::cout << "'t': Increase Wireframe Red\n";
-    std::cout << "'h': Increase Wireframe Green\n";
-    std::cout << "'n': Increase Wireframe Blue\n";
+	glutDisplayFunc(MyDisplay); // call the drawing function
 
-    glutMainLoop();
-    return 0;
+	glutKeyboardFunc(Keyboard);
+	glutSpecialFunc(specialKeyboard);
+	glutSpecialUpFunc(specialKeyboardRelease);
+
+	glutMainLoop();
+	return 0;
 }
+
+GameObject::GameObject() {
+	x = y = z = 0;
+	sizeX = sizeY = 1;
+	colorR = colorG = colorB = 1;
+	mass = 0;
+	canSee = true;
+	isSolid = false;
+	destroyed = false;
+	gravity = false;
+}
+
+void GameObject::DrawGameObject(bool sprite)
+{
+	glPushMatrix();
+	glTranslatef(x, y, z);
+
+	if (canSee && !destroyed)
+	{
+		if (sprite)
+		{
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(-0.5, -0.5, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+		else
+		{
+			glColor3f(colorR, colorG, colorB);
+
+			glBegin(GL_POLYGON);
+			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+		}
+	}
+	glPopMatrix();
+}
+
+void GameObject::DrawPlayer(bool sprite)
+{
+	glPushMatrix();
+	glTranslatef(x, y, z);
+
+	if (canSee && !destroyed)
+	{
+		//Draw Player
+		if (sprite)
+		{
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(-0.5, -0.5, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+		else
+		{
+			glColor3f(colorR, colorG, colorB);
+
+			glBegin(GL_POLYGON);
+			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+		}
+	}
+
+	glPopMatrix();
+}
+
