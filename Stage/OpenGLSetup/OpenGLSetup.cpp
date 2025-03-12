@@ -9,25 +9,23 @@
 using namespace irrklang;
 using namespace std;
 
-#define WIN_X 100
-#define WIN_Y 100
-#define WIN_H 600
-#define WIN_W 600
+#define WIN_X 0
+#define WIN_Y 0
+#define WIN_H 1080
+#define WIN_W 1920
 //-------------------------------------------------------------------------------------------------------------
 
-int frame = 0, groundNum = 2;
-float camX = 0.0f, camY = 0.0f;
+// Global Variables
+int frame = 0, groundNum = 0;
+float cameraX = 0.0f, cameraY = 0.0f;
+float cameraOffsetX = 2.0f, cameraOffsetY = 2.0f; // Offsets make cameras easier to understand. Might get reused for the game engine
 
-
-
-float speed = 0.15, gravity = 1;
-float gravityVelocity = 0.0f;
-float gravityAcceleration = 0.1f; // Acceleration due to gravity
-float maxFallSpeed = 2.0f;  // Cap maximum fall speed
+float speed = 0.15f;				// Horizontal speed of the player
+float gravity = 0.2f;
 
 float jumpTimer = 10, resetJumpTimer;
-float jumpAcceleration = 1.0f; // Adjust this value for jump height
-float jumpVelocity = 2.5f; // Adjust this value for initial jump velocity
+float jumpAcceleration = 1.0f;		// Jump height
+float jumpVelocity = 0.5f;			// Initial upward jump velocity
 
 bool showCollision = true;
 
@@ -38,42 +36,147 @@ ISoundEngine* SoundEngine = createIrrKlangDevice();
 
 GLuint texID[5]; // Texture ID's for the four textures.
 
-char* textureFileNames[4] = {	// File names for the files from which texture images are loaded
-	(char*)"sprite/coffee0.png",
-	(char*)"sprite/coffee1.png",
-	(char*)"sprite/coffee2.png",
-	(char*)"sprite/coffee3.png",
+char* textureFileNames[30] = {	// File names for the files from which texture images are loaded
+	(char*)"sprite/knightRightMoving (1).png",
+	(char*)"sprite/knightRightMoving (2).png",
+	(char*)"sprite/knightRightMoving (3).png",
+	(char*)"sprite/knightRightMoving (4).png",
+	(char*)"sprite/knightRightMoving (5).png",
+	(char*)"sprite/knightRightMoving (6).png",
+	(char*)"sprite/knightRightMoving (7).png",
+	(char*)"sprite/knightRightMoving (8).png",
+	// Environment
+	(char*)"sprite/Tiles494.png",
 };
 
-char* catMeows[1] = {
-	(char*)"audio/Cat 1.wav",
-
+char* catMeows[3] = {
+	(char*)"audio/nes-sfx24.wav",
+	(char*)"audio/nes-sfx26.wav",
+	(char*)"audio/nes-sfx25.wav",
 };
 
 // Gameobject class
 class GameObject
 {
 public:
-	// object state
+	// Position and size
 	GLfloat   x, y, z, sizeX, sizeY;
+
+	// RGB color
 	GLfloat   colorR, colorG, colorB;
+
+	// Additional properties
 	GLfloat   mass;
-	bool	  canSee;
-	bool      isSolid;
-	bool      destroyed;
-	bool      gravity;
+	bool	  canSee;		// Visable Object
+	bool      isSolid;		// Block Objects
+	bool      destroyed;	// Remove Object
+	bool      gravity;		// Gravity affects the object
+	int		  textureIndex; // Texture Use
 
-	GameObject();
+	GameObject();	// Constructor
 
-	void DrawGameObject(bool);
-	void DrawPlayer(bool);
+	void DrawGameObject(bool sprite);
+	void DrawPlayer(bool sprite);
 };
 
-// Gameobjects on the screen
-GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
+// ========================================================================================================================================================================
 
+// Global Objects
+
+// Player and Collision Boxes
+GameObject player, bottomCheck, leftCheck, rightCheck, topCheck;
+
+// Solid Blocks
+GameObject CreateGround(float x, float y, float width, float height, float r, float g, float b, bool collider = true, int texIndex = -1)
+{
+	GameObject ground;
+	ground.x = x;						// X Axis Origin
+	ground.y = y;						// Y Axis Origin
+	ground.sizeX = width;				// Width
+	ground.sizeY = height;				// Height
+	ground.colorR = r;					// Red
+	ground.colorG = g;					// Green
+	ground.colorB = b;					// Blue
+	ground.isSolid = collider;			// Collision
+	ground.canSee = true;				// Visibility
+	ground.textureIndex = texIndex;		// Store Texture Index
+	return ground;
+}
+
+GameObject ground[100];
+
+// Collectable object
+GameObject collectible;
+
+GameObject createInvisibleCollider(float x, float y, float width, float height) {
+	GameObject collider;
+	collider.x = x;
+	collider.y = y;
+	collider.sizeX = width;
+	collider.sizeY = height;
+
+	collider.isSolid = true;
+	collider.canSee = false;
+	collider.colorR = 1.0f;    
+	collider.colorG = 0.0f;
+	collider.colorB = 0.0f;
+	collider.textureIndex = -1; // No texture
+
+	return collider;
+}
+
+// GameObject Helper Functions
+// Unified function for Horizontal (H) and Vertical (V) columns 
+void createColumn(char direction, float startX, float startY, int length, float tileSize,
+	float r, float g, float b, bool collider = true, int texIndex = 8)
+{
+	// Create visual tiles without individual colliders
+	for (int i = 0; i < length; i++)
+	{
+		float xPos = (direction == 'H' || direction == 'h') ? startX + i * tileSize : startX;
+		float yPos = (direction == 'V' || direction == 'v') ? startY + i * tileSize : startY;
+
+		ground[groundNum] = CreateGround(
+			xPos, yPos,
+			tileSize, tileSize,
+			r, g, b,
+			false,      // visual tiles, no individual collider
+			texIndex
+		);
+
+		groundNum++;
+	}
+
+	// Adjust collider position slightly for accurate alignment
+	if (collider)
+	{
+		float colliderWidth = (direction == 'H' || direction == 'h') ? tileSize * length : tileSize;
+		float colliderHeight = (direction == 'V' || direction == 'v' ||  direction == 'B' || direction == 'b') ? tileSize * length : tileSize;
+
+		// Small vertical adjustment for horizontal collider alignment
+		float colliderX = startX;
+		float colliderY = startY;
+
+		if (direction == 'H' || direction == 'h' || direction == 'B' || direction == 'b') {
+			colliderY += tileSize * 0.05f;  // slight upward adjustment (5% of tileSize)
+		}
+
+		ground[groundNum] = createInvisibleCollider(
+			colliderX, colliderY,
+			colliderWidth, colliderHeight
+		);
+		ground[groundNum].canSee = false; // debugging visibility
+		groundNum++;
+	}
+}
+
+
+
+
+// Implementing Collision Detection (Used from the platform example)
 bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 {
+	// If either end up getting destroied, skip collisionGameObject
 	if (one.destroyed || two.destroyed)
 		return false;
 
@@ -88,156 +191,223 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	return collisionX && collisionY;
 }
 
-void updateCamera() {
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-
-	// Set the camera to always center on the player's position
-	glOrtho(player.x - 7.0, player.x + 7.0, player.y - 7.0, player.y + 7.0, -10.0, 10.0);
-
-	glMatrixMode(GL_MODELVIEW);
-}
+// ========================================================================================================================================================================
+// Environment Initialization
 
 void init(void) {
+	// Clear The Window + Set Color
+	glClearColor(0.5f, 0.5f, 0.5f, 1.0f); 
 
-	glClearColor(0.5f, 0.5f, 0.5f, 1.0f); // clear the window screen and change the background color
+
+	// 2D Projection Setup
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho(-7.0, 7.0, -7.0, 7.0, -10.0, 10.0);
+	glOrtho(-10.0, 10.0, -10.0, 5.0, -10.0, 10.0);
 
+	// Prepare jump timer
 	resetJumpTimer = jumpTimer;
 
+	// Give collision check boxes a color
 	bottomCheck.colorR = 0;
 	leftCheck.colorR = 0;
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
 
-	ground[0].x = -3.5;
-	ground[0].y = -3;
-	ground[0].sizeX = 34;
-	ground[0].colorG = 1;
 
-	ground[1].x = 3.5;
-	ground[1].y = -3;
-	ground[1].sizeX = 3;
-	ground[1].colorG = 0;
+	// Ground Setup
+	
+	// Sets
+// Horizontal Column (solid and visible)
+	createColumn('H', -3.5f, -3.0f, 6, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
 
-	ground[2].x = -5.5;
-	ground[2].y = -1;
-	ground[2].sizeX = 3;
-	ground[2].colorG = 0;
+	// Vertical Column Left Side (non-solid, visible)
+	createColumn('V', -3.5f, -8.0f, 15, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
 
-	collectible.x = -4;
-	collectible.y = -2;
-	collectible.sizeX = 0.6;
-	collectible.sizeY = 0.7;
-	collectible.colorB = 0;
+	// Invisible collider aligned vertically
+	//ground[groundNum++] = createInvisibleCollider(-3.5f, -8.0f, 1.0f, 15.0f);groundNum++;
 
-	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
+	// Vertical Column Right (visual, no collision)
+	createColumn('V', 3.5f, -8.0f, 15, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+
+	// Invisible collider aligned vertically (right side)
+	//ground[groundNum++] = createInvisibleCollider(3.5f, -8.0f, 1.0f, 15.0f);groundNum++;
+
+	// Additional Short Vertical Column (visual, no collision)
+	createColumn('V', 3.5f, -8.0f, 4, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+
+	// Bottom Horizontal Column (solid and visible)
+	createColumn('H', -1.5f, -8.0f, 6, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+
+	// Individual Ground Tiles (solid & visible)
+
+	//createColumn('V', 2.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+	createColumn('H', 1.5f, -2.0f, 2, 1.0f, 2.0f, 1.0f, 0.0f, true, 8);
+	//createColumn('V', 0.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+	//createColumn('H', 3.5f, -2.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+	//createColumn('V', 3.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+
+
+
+	// Collectable Setup
+	collectible.x = 2.0f;
+	collectible.y = 4.0f;
+	collectible.sizeX = 0.6f;
+	collectible.sizeY = 0.7f;
+	collectible.colorB = 0.0f;
+
+	// Sound System BGM
+	SoundEngine->play2D("audio/track_25.OGG", true);
 }
 
-void CreatePlayer(bool show) {
-	// Draw player sprite and ground check
-	glPushMatrix();
+// Draw Player Character + Colliders
+void CreatePlayer(bool show)
+{
+	glPushMatrix(); // Player Character
+
+	// Draw Player and Size
+	player.sizeX = 1.0f;
+	player.sizeY = 1.0f;
 	player.DrawPlayer(true);
-	bottomCheck.x = player.x + 0.2;
+
+	// Bottom Collision Check
+	// Offesets
+	bottomCheck.x = player.x + player.sizeX * 0.35f;
 	bottomCheck.y = player.y;
-	bottomCheck.sizeX = 0.6;
-	bottomCheck.sizeY = 0.2;
+
+	// Size
+	bottomCheck.sizeX = player.sizeX * 0.30f;
+	bottomCheck.sizeY = player.sizeY * 0.05f;
 
 	bottomCheck.canSee = show;
+	bottomCheck.DrawGameObject(false);
 
-	leftCheck.x = player.x;
-	leftCheck.y = player.y + 0.2;
-	leftCheck.sizeX = 0.2;
-	leftCheck.sizeY = 0.6;
 
-	leftCheck.canSee = show;
+	// Top Collision Check
+	// Offesets
+	topCheck.x = player.x + player.sizeX * 0.35f;
+	topCheck.y = player.y + player.sizeY * 0.80f;
 
-	rightCheck.x = player.x + 0.8;
-	rightCheck.y = player.y + 0.2;
-	rightCheck.sizeX = 0.2;
-	rightCheck.sizeY = 0.6;
-
-	rightCheck.canSee = show;
-
-	topCheck.x = player.x + 0.2;
-	topCheck.y = player.y + 0.8;
-	topCheck.sizeX = 0.6;
-	topCheck.sizeY = 0.2;
+	// Size
+	topCheck.sizeX = player.sizeX * 0.30f;
+	topCheck.sizeY = player.sizeY * 0.05f;
 
 	topCheck.canSee = show;
-
-	bottomCheck.DrawGameObject(false);
-	leftCheck.DrawGameObject(false);
-	rightCheck.DrawGameObject(false);
 	topCheck.DrawGameObject(false);
+
+	// Left Collision Check
+	// Offesets
+	leftCheck.x = player.x + player.sizeX * 0.20f;
+	leftCheck.y = player.y + player.sizeY * 0.80f;
+
+	// Size
+	leftCheck.sizeX = player.sizeX * 0.05f;
+	leftCheck.sizeY = -player.sizeY * 0.75f;
+
+	leftCheck.canSee = show;
+	leftCheck.DrawGameObject(false);
+
+	// Right Collision Check
+	// Offesets
+	rightCheck.x = player.x + player.sizeX * 0.75f;
+	rightCheck.y = player.y + player.sizeY * 0.80f;
+
+	// Size
+	rightCheck.sizeX = player.sizeX * 0.05f;
+	rightCheck.sizeY = -player.sizeY * 0.75f;
+
+	rightCheck.canSee = show;
+	rightCheck.DrawGameObject(false);
+
 	glPopMatrix();
 }
+// ========================================================================================================================================================================
+// Environment Logic
 
+// Physics
 void gravityCheck() {
 	onGround = false;
+	// If bottomCheck collides with any ground object: onGround=true
 
-	for (int i = 0; i <= groundNum; ++i) {
-		if (CheckCollision(bottomCheck, ground[i])) {
+	for (int i = 0; i < groundNum; ++i) {
+		if (ground[i].isSolid && CheckCollision(bottomCheck, ground[i])) {
 			onGround = true;
 			break;
 		}
 	}
 
-	for (int i = 0; i <= groundNum; ++i) {
-		if (CheckCollision(leftCheck, ground[i])) {
+	// If leftCheck collides: push the player right
+	for (int i = 0; i < groundNum; ++i) {
+		if (ground[i].isSolid && CheckCollision(leftCheck, ground[i])) {
 			player.x += speed;
 			break;
 		}
 	}
 
-	for (int i = 0; i <= groundNum; ++i) {
-		if (CheckCollision(rightCheck, ground[i])) {
+	// If rightCheck collides: push the player left
+	for (int i = 0; i < groundNum; ++i) {
+		if (ground[i].isSolid && CheckCollision(rightCheck, ground[i])) {
 			player.x -= speed;
 			break;
 		}
 	}
 
-	for (int i = 0; i <= groundNum; ++i) {
-		if (CheckCollision(topCheck, ground[i]) && jump) {
+	// If topCheck collides (while jumping): Reset Jump Timer
+	for (int i = 0; i < groundNum; ++i) {
+		if (ground[i].isSolid && CheckCollision(topCheck, ground[i]) && jump) {
 			jump = false;
 			jumpTimer = resetJumpTimer;
 			break;
 		}
 	}
-	
+
+	// If not on ground: Apply Gravity
 	if (!onGround) {
-		gravityVelocity -= gravityAcceleration; // Gravity pulls down
-		if (gravityVelocity < -maxFallSpeed) gravityVelocity = -maxFallSpeed; // Cap fall speed
-		player.y += gravityVelocity; // Apply velocity
-	}
-	else {
-		gravityVelocity = 0; // Reset velocity when on ground
+		// Apply gravity
+		player.y -= gravity;
 	}
 }
 
+
+// ========================================================================================================================================================================
+// Main Display
+
 void MyDisplay() {
 	glClear(GL_COLOR_BUFFER_BIT);
-	updateCamera();
-	// Makes the player
+	// Clear the screen
+
+	// Update camera position (smooth follow effect)
+	cameraX = player.x + player.sizeX / 2 + cameraOffsetX;
+	cameraY = player.y + player.sizeY / 2 + cameraOffsetY;
+
+	// Set view matrix to follow the player
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(	cameraX, cameraY, 5,		// Camera position (x, y, z)
+				cameraX, cameraY, 0,		// Looking at (player)
+				0, 1, 0);					// Up vector (y-axis)
+
+	// Draws the player (with or without collision visualized)
 	CreatePlayer(showCollision);
 
-	// Makes the ground
-	ground[0].DrawGameObject(false);
-	//ground[1].DrawGameObject(false);
-	//ground[2].DrawGameObject(false);
+	// Draws the ground
+	for (int i = 0; i < groundNum; i++) {
+		ground[i].DrawGameObject(true);
+	}
 
-	// Makes the collectible
+	// Draw the collectible
 	collectible.DrawGameObject(false);
 
-	// Removes the collectible
-	if (CheckCollision(player, collectible))
-		collectible.destroyed = true;
 
+	// Removes the collectible when Touched by Player
+	if (CheckCollision(player, collectible))
+		collectible.destroyed = true; // Check collision Skipped
+
+	// Enable Rules:
+
+	// Apply Gravity + Collision
 	gravityCheck();
 
-	//Movement
+	// Apply Player Movement Logic
 	if (lt)
 		player.x -= speed;
 	if (rt)
@@ -247,21 +417,21 @@ void MyDisplay() {
 	glutSwapBuffers();
 }
 
+// ========================================================================================================================================================================
+// Controls
+
 void specialKeyboard(int key, int x, int y) {
 
 	switch (key) {
 	case GLUT_KEY_LEFT:
 		lt = true;
 		rt = false;
-		camX += 0.05f * speed;
 		break;
+
 	case GLUT_KEY_RIGHT:
 		lt = false;
 		rt = true;
-		camX -= 0.05f * speed;
 		break;
-		glOrtho(-1,1, -1, 1, -1, 1);
-		glTranslatef(camX, camY, 0);
 	}
 
 	glutPostRedisplay();
@@ -287,7 +457,7 @@ void Keyboard(unsigned char key, int x, int y)
 		showCollision = !showCollision;
 		break;
 	case 32: // Spacebar
-		if (onGround && !jump) {
+		if (onGround) {
 			SoundEngine->play2D(catMeows[1], false);
 			jump = true;
 		}
@@ -299,10 +469,14 @@ void Keyboard(unsigned char key, int x, int y)
 	glutPostRedisplay();
 }
 
+
+// ========================================================================================================================================================================
+// Loading Textures
+
 void loadTextures() {
 	int i;
-	glGenTextures(4, texID); // Get the texture object IDs.
-	for (i = 0; i < 4; i++) {
+	glGenTextures(9, texID); // Get the texture object IDs (Reserve IDs)
+	for (i = 0; i < 9; i++) {
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
 		if (format == FIF_UNKNOWN) {
@@ -337,24 +511,32 @@ void loadTextures() {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set blending function
 }
 
+// ========================================================================================================================================================================
+// Global Timer
+
 void timer(int v)
 {
 	frame++;
 
-	if (frame >= 4) {
+	if (frame >= 6) {
 		frame = 0;
 	}
 
-	// jump timer
 	if (jump) {
 		if (jumpTimer > 0) {
+			// Temporary copies to show how velocity changes 
 			float jumpAccelerationTemp = jumpAcceleration;
 			float jumpVelocityTemp = jumpVelocity;
-			player.y += jumpVelocityTemp; // Increment player's y-coordinate based on velocity
-			jumpVelocityTemp -= jumpAccelerationTemp; // Apply gravity to decrease velocity
+
+			// Move player up
+			player.y += jumpVelocityTemp;
+			// Reduce velocity over time
+			jumpVelocityTemp -= jumpAccelerationTemp;
+
 			jumpTimer--;
 		}
 		else {
+			// Reset jump
 			jump = false;
 			jumpTimer = resetJumpTimer;
 		}
@@ -363,6 +545,9 @@ void timer(int v)
 	glutPostRedisplay();
 	glutTimerFunc(100, timer, v); // Adjust frame delay based on FPS
 }
+
+// ========================================================================================================================================================================
+// Main
 
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
@@ -387,6 +572,9 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+// ========================================================================================================================================================================
+// Game Object Implementation
+
 GameObject::GameObject() {
 	x = y = z = 0;
 	sizeX = sizeY = 1;
@@ -403,15 +591,17 @@ void GameObject::DrawGameObject(bool sprite)
 	glPushMatrix();
 	glTranslatef(x, y, z);
 
+	// Only draw if not destroyed and is visible
 	if (canSee && !destroyed)
 	{
-		if (sprite)
+		if (sprite && textureIndex >= 0)
 		{
 			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 
 			glEnable(GL_TEXTURE_2D); // Enable texturing
 
-			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+			// Use the current frame for animation or [x] set number
+			glBindTexture(GL_TEXTURE_2D, texID[textureIndex]); // Which texture
 
 			glBegin(GL_POLYGON);
 			glTexCoord2f(0.0, 0.0);
@@ -426,7 +616,7 @@ void GameObject::DrawGameObject(bool sprite)
 
 			glDisable(GL_TEXTURE_2D); // Turn texturing off
 		}
-		else
+		else // Fallback
 		{
 			glColor3f(colorR, colorG, colorB);
 
