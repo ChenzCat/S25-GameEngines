@@ -6,6 +6,8 @@
 #include <array>
 #include <iostream>
 #include <IrrKlang/irrKlang.h>
+#include <string>
+
 using namespace irrklang;
 using namespace std;
 
@@ -18,7 +20,7 @@ using namespace std;
 // Global Variables
 int frame = 0, groundNum = 0;
 float cameraX = 0.0f, cameraY = 0.0f;
-float cameraOffsetX = 2.0f, cameraOffsetY = 2.0f; // Offsets make cameras easier to understand. Might get reused for the game engine
+float cameraOffsetX = 0.0f, cameraOffsetY = 3.0f; // Offsets make cameras easier to understand. Might get reused for the game engine
 
 float speed = 0.15f;				// Horizontal speed of the player
 float gravity = 0.2f;
@@ -27,16 +29,27 @@ float jumpTimer = 10, resetJumpTimer;
 float jumpAcceleration = 1.0f;		// Jump height
 float jumpVelocity = 0.5f;			// Initial upward jump velocity
 
+// Collision
 bool showCollision = true;
-
 bool lt, rt, jump, contact, onGround;
+
+// Mechanics
+int totalCoins = 10;
+int coinsCollected = 0;
+
+// Game States
+bool pausedState = false;
+bool menuState;
+bool gameOverState = false;
+bool winState;
+int timeLeft = 60; // Start with 60 seconds
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
-GLuint texID[5]; // Texture ID's for the four textures.
+GLuint texID[22]; // Texture ID's for the four textures.
 
-char* textureFileNames[30] = {	// File names for the files from which texture images are loaded
+char* textureFileNames[22] = {	// File names for the files from which texture images are loaded
 	(char*)"sprite/knightRightMoving (1).png",
 	(char*)"sprite/knightRightMoving (2).png",
 	(char*)"sprite/knightRightMoving (3).png",
@@ -46,7 +59,20 @@ char* textureFileNames[30] = {	// File names for the files from which texture im
 	(char*)"sprite/knightRightMoving (7).png",
 	(char*)"sprite/knightRightMoving (8).png",
 	// Environment
+	(char*)"sprite/Tiles493.png",
 	(char*)"sprite/Tiles494.png",
+	(char*)"sprite/Tiles495.png",
+	(char*)"sprite/Tiles116.png",
+	(char*)"sprite/Tiles117.png",
+	(char*)"sprite/Tiles118.png",
+	(char*)"sprite/Tiles119.png",
+	(char*)"sprite/Tiles164.png",
+	(char*)"sprite/Tiles165.png",
+	(char*)"sprite/Tiles166.png",
+	(char*)"sprite/Tiles167.png",
+	(char*)"sprite/Tiles415.png",
+	(char*)"sprite/Tiles416.png",
+	(char*)"sprite/Tiles417.png",
 };
 
 char* catMeows[3] = {
@@ -87,23 +113,20 @@ public:
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck;
 
 // Solid Blocks
-GameObject CreateGround(float x, float y, float width, float height, float r, float g, float b, bool collider = true, int texIndex = -1)
+GameObject CreateGround(float x, float y, float width, float height, bool collider = true, int texIndex = -1)
 {
 	GameObject ground;
 	ground.x = x;						// X Axis Origin
 	ground.y = y;						// Y Axis Origin
 	ground.sizeX = width;				// Width
 	ground.sizeY = height;				// Height
-	ground.colorR = r;					// Red
-	ground.colorG = g;					// Green
-	ground.colorB = b;					// Blue
 	ground.isSolid = collider;			// Collision
 	ground.canSee = true;				// Visibility
 	ground.textureIndex = texIndex;		// Store Texture Index
 	return ground;
 }
 
-GameObject ground[100];
+GameObject ground[200];
 
 // Collectable object
 GameObject collectible;
@@ -117,7 +140,7 @@ GameObject createInvisibleCollider(float x, float y, float width, float height) 
 
 	collider.isSolid = true;
 	collider.canSee = false;
-	collider.colorR = 1.0f;    
+	collider.colorR = 1.0f;
 	collider.colorG = 0.0f;
 	collider.colorB = 0.0f;
 	collider.textureIndex = -1; // No texture
@@ -126,49 +149,92 @@ GameObject createInvisibleCollider(float x, float y, float width, float height) 
 }
 
 // GameObject Helper Functions
-// Unified function for Horizontal (H) and Vertical (V) columns 
-void createColumn(char direction, float startX, float startY, int length, float tileSize,
-	float r, float g, float b, bool collider = true, int texIndex = 8)
+
+void createColumn(char direction, float startX, float startY,
+	int length, int rows, float tileSize,
+	bool collider = true,
+	int startTexIndex = 8,
+	int endTexIndex = -1,
+	bool invisible = false  // <-- NEW PARAMETER
+)
 {
-	// Create visual tiles without individual colliders
-	for (int i = 0; i < length; i++)
+	// If invisible is false, we create visible tiles.
+	// If invisible is true, we skip making visible tiles, but still make the collider if requested.
+
+	if (!invisible)
 	{
-		float xPos = (direction == 'H' || direction == 'h') ? startX + i * tileSize : startX;
-		float yPos = (direction == 'V' || direction == 'v') ? startY + i * tileSize : startY;
+		int totalTiles = length * rows;
+		int textureRange = (endTexIndex - startTexIndex) + 1;
+		if (textureRange < 1) textureRange = 1; // Safety fallback
 
-		ground[groundNum] = CreateGround(
-			xPos, yPos,
-			tileSize, tileSize,
-			r, g, b,
-			false,      // visual tiles, no individual collider
-			texIndex
-		);
+		int tileCounter = 0; // Will increment as we place each tile
 
-		groundNum++;
+		// Loop over rows (r) and columns (c)
+		for (int r = 0; r < rows; r++)
+		{
+			for (int c = 0; c < length; c++)
+			{
+				float xPos, yPos;
+
+				// 'H' => horizontal
+				if (direction == 'H' || direction == 'h')
+				{
+					xPos = startX + c * tileSize;
+					yPos = startY + r * tileSize;
+				}
+				// 'V' => vertical
+				else
+				{
+					xPos = startX + r * tileSize;
+					yPos = startY + c * tileSize;
+				}
+
+				// Calculate which texture to use for this tile
+				int currentTexOffset = tileCounter % textureRange;
+				int currentTexIndex = startTexIndex + currentTexOffset;
+
+				// Create each tile with the current texture
+				ground[groundNum] = CreateGround(
+					xPos,
+					yPos,
+					tileSize,
+					tileSize,
+					false,    // Non-collidable by default
+					currentTexIndex
+				);
+				groundNum++;
+				tileCounter++;
+			}
+		}
 	}
+	// If invisible == true, we skip creating visible tiles entirely
 
-	// Adjust collider position slightly for accurate alignment
+	// Optionally create a single invisible collider for the entire block
 	if (collider)
 	{
-		float colliderWidth = (direction == 'H' || direction == 'h') ? tileSize * length : tileSize;
-		float colliderHeight = (direction == 'V' || direction == 'v' ||  direction == 'B' || direction == 'b') ? tileSize * length : tileSize;
+		float colliderWidth, colliderHeight;
 
-		// Small vertical adjustment for horizontal collider alignment
-		float colliderX = startX;
-		float colliderY = startY;
-
-		if (direction == 'H' || direction == 'h' || direction == 'B' || direction == 'b') {
-			colliderY += tileSize * 0.05f;  // slight upward adjustment (5% of tileSize)
+		if (direction == 'H' || direction == 'h')
+		{
+			colliderWidth = length * tileSize;
+			colliderHeight = rows * tileSize;
+		}
+		else // 'V' or 'v'
+		{
+			colliderWidth = rows * tileSize;
+			colliderHeight = length * tileSize;
 		}
 
 		ground[groundNum] = createInvisibleCollider(
-			colliderX, colliderY,
-			colliderWidth, colliderHeight
+			startX,
+			startY,
+			colliderWidth,
+			colliderHeight
 		);
-		ground[groundNum].canSee = false; // debugging visibility
 		groundNum++;
 	}
 }
+
 
 
 
@@ -180,11 +246,12 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	if (one.destroyed || two.destroyed)
 		return false;
 
-	// collision x-axis?
-	bool collisionX = one.x + one.sizeX >= two.x && two.x + two.sizeX >= one.x;
-
-	// collision y-axis?
-	bool collisionY = one.y + one.sizeY >= two.y && two.y + two.sizeY >= one.y;
+	// collision Y:
+	bool collisionX = (one.x + one.sizeX + 0.01f >= two.x) &&
+		(two.x + two.sizeX + 0.01f >= one.x);
+	// collision X:
+	bool collisionY = (one.y + one.sizeY + 0.01f >= two.y) &&
+		(two.y + two.sizeY + 0.01f >= one.y);
 
 
 	// collision only if on both axes
@@ -196,7 +263,7 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 
 void init(void) {
 	// Clear The Window + Set Color
-	glClearColor(0.5f, 0.5f, 0.5f, 1.0f); 
+	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
 
 	// 2D Projection Setup
@@ -213,46 +280,24 @@ void init(void) {
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
 
+	// Sprite Sheet
+	createColumn('H', -3.5f, 3.0f, 22, 2, 1.0f, false, 1, 22);
 
-	// Ground Setup
-	
-	// Sets
-// Horizontal Column (solid and visible)
-	createColumn('H', -3.5f, -3.0f, 6, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+	// Floor
+	createColumn('H', -5.5f, -3.0f, 30, 2, 1.0f, true, 12);
+	createColumn('H', -5.5f, 1.0f, 30, 2, 1.0f, true, 11);
 
-	// Vertical Column Left Side (non-solid, visible)
-	createColumn('V', -3.5f, -8.0f, 15, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
 
-	// Invisible collider aligned vertically
-	//ground[groundNum++] = createInvisibleCollider(-3.5f, -8.0f, 1.0f, 15.0f);groundNum++;
-
-	// Vertical Column Right (visual, no collision)
-	createColumn('V', 3.5f, -8.0f, 15, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-
-	// Invisible collider aligned vertically (right side)
-	//ground[groundNum++] = createInvisibleCollider(3.5f, -8.0f, 1.0f, 15.0f);groundNum++;
-
-	// Additional Short Vertical Column (visual, no collision)
-	createColumn('V', 3.5f, -8.0f, 4, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-
-	// Bottom Horizontal Column (solid and visible)
-	createColumn('H', -1.5f, -8.0f, 6, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-
-	// Individual Ground Tiles (solid & visible)
-
-	//createColumn('V', 2.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-	createColumn('H', 1.5f, -2.0f, 2, 1.0f, 2.0f, 1.0f, 0.0f, true, 8);
-	//createColumn('V', 0.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-	//createColumn('H', 3.5f, -2.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
-	//createColumn('V', 3.5f, -1.0f, 1, 1.0f, 0.0f, 1.0f, 0.0f, true, 8);
+	// Background
+	createColumn('H', -4.5f, -1.0f, 6, 2, 1.0f, false , 10, 10);
 
 
 
 	// Collectable Setup
-	collectible.x = 2.0f;
-	collectible.y = 4.0f;
-	collectible.sizeX = 0.6f;
-	collectible.sizeY = 0.7f;
+	collectible.x = -2.0f;
+	collectible.y = 0.0f;
+	collectible.sizeX = 0.2f;
+	collectible.sizeY = 0.4f;
 	collectible.colorB = 0.0f;
 
 	// Sound System BGM
@@ -326,8 +371,8 @@ void CreatePlayer(bool show)
 // Physics
 void gravityCheck() {
 	onGround = false;
-	// If bottomCheck collides with any ground object: onGround=true
 
+	// If bottomCheck collides with any ground object: onGround=true
 	for (int i = 0; i < groundNum; ++i) {
 		if (ground[i].isSolid && CheckCollision(bottomCheck, ground[i])) {
 			onGround = true;
@@ -365,6 +410,12 @@ void gravityCheck() {
 		// Apply gravity
 		player.y -= gravity;
 	}
+
+	if (player.y < -10.0) { // Out of bounds check
+		gameOverState = true;
+	}
+
+
 }
 
 
@@ -375,6 +426,40 @@ void MyDisplay() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	// Clear the screen
 
+	if (pausedState) {
+		glColor3f(1.0, 1.0, 1.0);
+		glRasterPos2f(player.x - 1, player.y);
+		const char* message = "GAME PAUSED" "- Press P to Resume";
+		for (int i = 0; message[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+		}
+		glutSwapBuffers();
+		return;
+	}
+
+	if (gameOverState) {
+		glColor3f(1.0, 1.0, 1.0);
+		glRasterPos2f(player.x - 1, player.y + 1);
+		const char* message = "GAME OVER!";
+		for (int i = 0; message[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+		}
+		glutSwapBuffers();
+		return;
+	}
+
+	if (winState) {
+		glColor3f(0.0, 1.0, 0.0);
+		glRasterPos2f(player.x - 1, player.y);
+		const char* message = "YOU WIN!";
+		for (int i = 0; message[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+		}
+		glutSwapBuffers();
+		return;
+	}
+
+
 	// Update camera position (smooth follow effect)
 	cameraX = player.x + player.sizeX / 2 + cameraOffsetX;
 	cameraY = player.y + player.sizeY / 2 + cameraOffsetY;
@@ -382,17 +467,32 @@ void MyDisplay() {
 	// Set view matrix to follow the player
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	gluLookAt(	cameraX, cameraY, 5,		// Camera position (x, y, z)
-				cameraX, cameraY, 0,		// Looking at (player)
-				0, 1, 0);					// Up vector (y-axis)
+	gluLookAt(cameraX, cameraY, 5,		// Camera position (x, y, z)
+		cameraX, cameraY, 0,			// Looking at (player)
+		0, 1, 0);						// Up vector (y-axis)
+
+	for (int i = 0; i < groundNum; i++) {
+		if (!ground[i].isSolid) {
+			ground[i].DrawGameObject(true);
+		}
+	}
 
 	// Draws the player (with or without collision visualized)
 	CreatePlayer(showCollision);
 
-	// Draws the ground
+	// 2) Draw collidable objects next
 	for (int i = 0; i < groundNum; i++) {
-		ground[i].DrawGameObject(true);
+		if (ground[i].isSolid) {
+			ground[i].DrawGameObject(true);
+		}
 	}
+
+
+
+
+
+
+
 
 	// Draw the collectible
 	collectible.DrawGameObject(false);
@@ -400,18 +500,40 @@ void MyDisplay() {
 
 	// Removes the collectible when Touched by Player
 	if (CheckCollision(player, collectible))
+	{
 		collectible.destroyed = true; // Check collision Skipped
+		winState = true;
+	}
+
+
 
 	// Enable Rules:
 
 	// Apply Gravity + Collision
 	gravityCheck();
 
+	// Timer
+	glColor3f(1.0, 1.0, 1.0);
+	glRasterPos2f(player.x - 0.2f, player.y + 0.8f);
+	string timerText = "Time: " + std::to_string(timeLeft);
+	for (char c : timerText)
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, c);
+
+	// Then the coin line (lower on the screen, or different offset)
+	glRasterPos2f(player.x - 0.2f, player.y + 0.6f);
+	string coinText = "Coins: " + to_string(coinsCollected) + "/" + to_string(totalCoins);
+	for (char c : coinText)
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, c);
+
 	// Apply Player Movement Logic
 	if (lt)
 		player.x -= speed;
 	if (rt)
 		player.x += speed;
+
+
+
+
 
 	glFlush();
 	glutSwapBuffers();
@@ -462,9 +584,15 @@ void Keyboard(unsigned char key, int x, int y)
 			jump = true;
 		}
 		break;
+
+	case 'p': // Toggle Pause
+		pausedState = !pausedState;
+		break;
+
 	case 27: // escape
 		exit(0);
 	}
+
 
 	glutPostRedisplay();
 }
@@ -475,8 +603,8 @@ void Keyboard(unsigned char key, int x, int y)
 
 void loadTextures() {
 	int i;
-	glGenTextures(9, texID); // Get the texture object IDs (Reserve IDs)
-	for (i = 0; i < 9; i++) {
+	glGenTextures(22, texID); // Get the texture object IDs (Reserve IDs)
+	for (i = 0; i < 22; i++) {
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
 		if (format == FIF_UNKNOWN) {
@@ -544,6 +672,17 @@ void timer(int v)
 
 	glutPostRedisplay();
 	glutTimerFunc(100, timer, v); // Adjust frame delay based on FPS
+}
+
+void collectionTimer(int v) {
+	if (!pausedState && !gameOverState && !winState) {
+		timeLeft--;
+		if (timeLeft <= 0) {
+			gameOverState = true;
+		}
+	}
+	glutPostRedisplay();
+	glutTimerFunc(1000, timer, 0); // Call every second
 }
 
 // ========================================================================================================================================================================
