@@ -47,72 +47,32 @@ int timeLeft = 60; // Start with 60 seconds
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
-GLuint texID[49]; // Texture ID's for the four textures.
+GLuint texID[22]; // Texture ID's for the four textures.
 
-char* textureFileNames[49] = {	// File names for the files from which texture images are loaded
-	// Knight
-	(char*)"sprite/KnightLeft1.png",
-	(char*)"sprite/KnightLeft2.png",
-	(char*)"sprite/KnightLeft3.png",
-	(char*)"sprite/KnightLeft4.png",
-	(char*)"sprite/KnightLeft5.png",
-	(char*)"sprite/KnightLeft6.png",
-	(char*)"sprite/KnightLeft7.png",
-	(char*)"sprite/KnightLeft8.png",
-	(char*)"sprite/KnightLeftStanding9.png",
-	(char*)"sprite/KnightRight10.png",
-	(char*)"sprite/KnightRight11.png",
-	(char*)"sprite/KnightRight12.png",
-	(char*)"sprite/KnightRight13.png",
-	(char*)"sprite/KnightRight14.png",
-	(char*)"sprite/KnightRight15.png",
-	(char*)"sprite/KnightRight16.png",
-	(char*)"sprite/KnightRight17.png",
-	(char*)"sprite/KnightRightStanding18.png",
-	
-	// Coffee
-	(char*)"sprite/Coffee19.png",
-	(char*)"sprite/Coffee20.png",
-	(char*)"sprite/Coffee21.png",
-	(char*)"sprite/Coffee22.png",
-
+char* textureFileNames[22] = {	// File names for the files from which texture images are loaded
+	(char*)"sprite/knightRightMoving (1).png",
+	(char*)"sprite/knightRightMoving (2).png",
+	(char*)"sprite/knightRightMoving (3).png",
+	(char*)"sprite/knightRightMoving (4).png",
+	(char*)"sprite/knightRightMoving (5).png",
+	(char*)"sprite/knightRightMoving (6).png",
+	(char*)"sprite/knightRightMoving (7).png",
+	(char*)"sprite/knightRightMoving (8).png",
 	// Environment
-		// Stone Top
-	(char*)"sprite/TopCornerLeft23.png",
-	(char*)"sprite/TopInnerLeft24.png",
-	(char*)"sprite/TopInnerRight25.png",
-	(char*)"sprite/TopCornerRight26.png",
-		// Stone Middle
-	(char*)"sprite/MiddleSideLeft27.png",
-	(char*)"sprite/MiddleSideRight28.png",
-		// Stone Bottom
-	(char*)"sprite/BottomCornerLeft29.png",
-	(char*)"sprite/BottomInnerLeft30.png",
-	(char*)"sprite/BottomInnerRight31.png",
-	(char*)"sprite/BottomCornerRight32.png",
-		// Stone Segment Bottom
-	(char*)"sprite/BottomSegment(1)33.png",
-	(char*)"sprite/BottomSegment(2)34.png",
-	(char*)"sprite/BottomSegment(3)35.png",
-		// Stone Segment Top
-	(char*)"sprite/TopSegment(1)36.png",
-	(char*)"sprite/TopSegment(2)37.png",
-	(char*)"sprite/TopSegment(3)38.png",
-		// Wood
-	(char*)"sprite/MiddleWoodLeft(1)39.png",
-	(char*)"sprite/MiddleWood(2)40.png",
-	(char*)"sprite/MiddleWoodRight(3)41.png",
-	(char*)"sprite/TopWood42.png",
-	(char*)"sprite/BottomWood43.png",
-		// Wood Beam
-	(char*)"sprite/Beam(1)44.png",
-	(char*)"sprite/Beam(2)45.png",
-	(char*)"sprite/Beam(3)46.png",
-	(char*)"sprite/Beam(4)47.png",
-	(char*)"sprite/Beam(5)48.png",
-		// Void
-	(char*)"sprite/Void49.png",
-
+	(char*)"sprite/Tiles493.png",
+	(char*)"sprite/Tiles494.png",
+	(char*)"sprite/Tiles495.png",
+	(char*)"sprite/Tiles116.png",
+	(char*)"sprite/Tiles117.png",
+	(char*)"sprite/Tiles118.png",
+	(char*)"sprite/Tiles119.png",
+	(char*)"sprite/Tiles164.png",
+	(char*)"sprite/Tiles165.png",
+	(char*)"sprite/Tiles166.png",
+	(char*)"sprite/Tiles167.png",
+	(char*)"sprite/Tiles415.png",
+	(char*)"sprite/Tiles416.png",
+	(char*)"sprite/Tiles417.png",
 };
 
 char* catMeows[3] = {
@@ -166,7 +126,7 @@ GameObject CreateGround(float x, float y, float width, float height, bool collid
 	return ground;
 }
 
-GameObject ground[300];
+GameObject ground[200];
 
 // Collectable object
 GameObject collectible;
@@ -321,17 +281,16 @@ void init(void) {
 	topCheck.colorR = 0;
 
 	// Sprite Sheet
-	//createColumn('H', -3.5f, 3.0f, 24, 2, 1.0f, false, 1, 47);
+	createColumn('H', -3.5f, 3.0f, 22, 2, 1.0f, false, 1, 22);
 
 	// Floor
-	createColumn('H', -5.5f, 4.0f, 30, 1, 1.0f, true, 33);
-	createColumn('H', -5.5f, -2.0f, 30, 1, 1.0f, true, 37);
-	createColumn('H', 4.5f, -1.0f, 1, 1, 1.0f, true, 37);
+	createColumn('H', -5.5f, -3.0f, 30, 2, 1.0f, true, 12);
+	createColumn('H', -5.5f, 1.0f, 30, 2, 1.0f, true, 11);
 
 
 	// Background
-	createColumn('H', -4.5f, 4.9f, 30, 5, 1.0f, false, 48);
-	createColumn('V', -5.5f, -1.0f, 2, 1, 1.0f, false, 42);
+	createColumn('H', -4.5f, -1.0f, 6, 2, 1.0f, false , 10, 10);
+
 
 
 	// Collectable Setup
@@ -342,7 +301,7 @@ void init(void) {
 	collectible.colorB = 0.0f;
 
 	// Sound System BGM
-	//SoundEngine->play2D("audio/track_25.OGG", true);
+	SoundEngine->play2D("audio/track_25.OGG", true);
 }
 
 // Draw Player Character + Colliders
@@ -357,12 +316,12 @@ void CreatePlayer(bool show)
 
 	// Bottom Collision Check
 	// Offesets
-	bottomCheck.x = player.x + player.sizeX * 0.15f;
+	bottomCheck.x = player.x + player.sizeX * 0.35f;
 	bottomCheck.y = player.y;
 
 	// Size
-	bottomCheck.sizeX = player.sizeX * 0.70f;
-	bottomCheck.sizeY = player.sizeY * 0.15f;
+	bottomCheck.sizeX = player.sizeX * 0.30f;
+	bottomCheck.sizeY = player.sizeY * 0.05f;
 
 	bottomCheck.canSee = show;
 	bottomCheck.DrawGameObject(false);
@@ -382,11 +341,11 @@ void CreatePlayer(bool show)
 
 	// Left Collision Check
 	// Offesets
-	leftCheck.x = player.x + player.sizeX * 0.05f;
+	leftCheck.x = player.x + player.sizeX * 0.20f;
 	leftCheck.y = player.y + player.sizeY * 0.80f;
 
 	// Size
-	leftCheck.sizeX = player.sizeX * 0.10f;
+	leftCheck.sizeX = player.sizeX * 0.05f;
 	leftCheck.sizeY = -player.sizeY * 0.75f;
 
 	leftCheck.canSee = show;
@@ -394,11 +353,11 @@ void CreatePlayer(bool show)
 
 	// Right Collision Check
 	// Offesets
-	rightCheck.x = player.x + player.sizeX * 0.85f;
+	rightCheck.x = player.x + player.sizeX * 0.75f;
 	rightCheck.y = player.y + player.sizeY * 0.80f;
 
 	// Size
-	rightCheck.sizeX = player.sizeX * 0.10f;
+	rightCheck.sizeX = player.sizeX * 0.05f;
 	rightCheck.sizeY = -player.sizeY * 0.75f;
 
 	rightCheck.canSee = show;
@@ -621,7 +580,7 @@ void Keyboard(unsigned char key, int x, int y)
 		break;
 	case 32: // Spacebar
 		if (onGround) {
-			//SoundEngine->play2D(catMeows[1], false);
+			SoundEngine->play2D(catMeows[1], false);
 			jump = true;
 		}
 		break;
@@ -644,8 +603,8 @@ void Keyboard(unsigned char key, int x, int y)
 
 void loadTextures() {
 	int i;
-	glGenTextures(49, texID); // Get the texture object IDs (Reserve IDs)
-	for (i = 0; i < 49; i++) {
+	glGenTextures(22, texID); // Get the texture object IDs (Reserve IDs)
+	for (i = 0; i < 22; i++) {
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
 		if (format == FIF_UNKNOWN) {
@@ -687,12 +646,11 @@ void timer(int v)
 {
 	frame++;
 
-	if (frame >= 18) {
+	if (frame >= 6) {
 		frame = 0;
 	}
 
 	if (jump) {
-		frame = 14;
 		if (jumpTimer > 0) {
 			// Temporary copies to show how velocity changes 
 			float jumpAccelerationTemp = jumpAcceleration;
@@ -856,3 +814,4 @@ void GameObject::DrawPlayer(bool sprite)
 
 	glPopMatrix();
 }
+
