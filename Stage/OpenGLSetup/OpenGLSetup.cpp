@@ -18,67 +18,127 @@ using namespace std;
 //-------------------------------------------------------------------------------------------------------------
 
 // Global Variables
-int frame = 0, groundNum = 0;
+int displayFrame = 0, groundNum = 0, coffeeNum = 0;
 float cameraX = 0.0f, cameraY = 0.0f;
 float cameraOffsetX = 0.0f, cameraOffsetY = 3.0f; // Offsets make cameras easier to understand. Might get reused for the game engine
 
 float speed = 0.15f;				// Horizontal speed of the player
 float gravity = 0.2f;
 
-float jumpTimer = 10, resetJumpTimer;
-float jumpAcceleration = 1.0f;		// Jump height
-float jumpVelocity = 0.5f;			// Initial upward jump velocity
+float jumpTimer = 5, resetJumpTimer;
+float jumpAcceleration = 0.15f;		// Jump height
+float jumpVelocity = 0.8f;			// Initial upward jump velocity
 
 // Collision
 bool showCollision = true;
 bool lt, rt, jump, contact, onGround;
 
 // Mechanics
-int totalCoins = 10;
-int coinsCollected = 0;
+int totalcoffee = 10;
+int coffeeCollected = 0;
 
 // Game States
 bool pausedState = false;
-bool menuState;
+bool menuState = true;
 bool gameOverState = false;
-bool winState;
-int timeLeft = 60; // Start with 60 seconds
+bool winState = false;
+static int timeLeft = 60; // Start with 60 seconds
+
+// Player States
+enum PlayerState
+{
+	IDLE_LEFT,
+	RUN_LEFT,
+	IDLE_RIGHT,
+	RUN_RIGHT,
+	JUMP_LEFT,
+	JUMP_RIGHT
+};
+
+
+PlayerState currentState = IDLE_RIGHT;  // Start facing right, idle
+int animFrameIndex = 0;                 // For cycling run frames
+bool facingLeft = false;                // Track last facing direction
+
+
+// coffee Animation
+int coffeeAnimFrame = 0;      // Animation frame index
+int coffeeAnimFrames = 4;     // Total coffee animation frames
+int coffeeAnimDelay = 200;    // Milliseconds per frame
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
-GLuint texID[22]; // Texture ID's for the four textures.
+GLuint texID[49]; // Texture ID's for the four textures.
 
-char* textureFileNames[22] = {	// File names for the files from which texture images are loaded
-	(char*)"sprite/knightRightMoving (1).png",
-	(char*)"sprite/knightRightMoving (2).png",
-	(char*)"sprite/knightRightMoving (3).png",
-	(char*)"sprite/knightRightMoving (4).png",
-	(char*)"sprite/knightRightMoving (5).png",
-	(char*)"sprite/knightRightMoving (6).png",
-	(char*)"sprite/knightRightMoving (7).png",
-	(char*)"sprite/knightRightMoving (8).png",
+char* textureFileNames[49] = {	// File names for the files from which texture images are loaded
+	// Knight
+	(char*)"sprite/KnightLeft1.png",
+	(char*)"sprite/KnightLeft2.png",
+	(char*)"sprite/KnightLeft3.png",
+	(char*)"sprite/KnightLeft4.png",
+	(char*)"sprite/KnightLeft5.png",
+	(char*)"sprite/KnightLeft6.png",
+	(char*)"sprite/KnightLeft7.png",
+	(char*)"sprite/KnightLeft8.png",
+	(char*)"sprite/KnightLeftStanding9.png",
+	(char*)"sprite/KnightRight10.png",
+	(char*)"sprite/KnightRight11.png",
+	(char*)"sprite/KnightRight12.png",
+	(char*)"sprite/KnightRight13.png",
+	(char*)"sprite/KnightRight14.png",
+	(char*)"sprite/KnightRight15.png",
+	(char*)"sprite/KnightRight16.png",
+	(char*)"sprite/KnightRight17.png",
+	(char*)"sprite/KnightRightStanding18.png",
+
+	// Coffee
+	(char*)"sprite/Coffee19.png",
+	(char*)"sprite/Coffee20.png",
+	(char*)"sprite/Coffee21.png",
+	(char*)"sprite/Coffee22.png",
+
 	// Environment
-	(char*)"sprite/Tiles493.png",
-	(char*)"sprite/Tiles494.png",
-	(char*)"sprite/Tiles495.png",
-	(char*)"sprite/Tiles116.png",
-	(char*)"sprite/Tiles117.png",
-	(char*)"sprite/Tiles118.png",
-	(char*)"sprite/Tiles119.png",
-	(char*)"sprite/Tiles164.png",
-	(char*)"sprite/Tiles165.png",
-	(char*)"sprite/Tiles166.png",
-	(char*)"sprite/Tiles167.png",
-	(char*)"sprite/Tiles415.png",
-	(char*)"sprite/Tiles416.png",
-	(char*)"sprite/Tiles417.png",
+		// Stone Top
+	(char*)"sprite/TopCornerLeft23.png",
+	(char*)"sprite/TopInnerLeft24.png",
+	(char*)"sprite/TopInnerRight25.png",
+	(char*)"sprite/TopCornerRight26.png",
+	// Stone Middle
+	(char*)"sprite/MiddleSideLeft27.png",
+	(char*)"sprite/MiddleSideRight28.png",
+	// Stone Bottom
+	(char*)"sprite/BottomCornerLeft29.png",
+	(char*)"sprite/BottomInnerLeft30.png",
+	(char*)"sprite/BottomInnerRight31.png",
+	(char*)"sprite/BottomCornerRight32.png",
+	// Stone Segment Bottom
+	(char*)"sprite/BottomSegment(1)33.png",
+	(char*)"sprite/BottomSegment(2)34.png",
+	(char*)"sprite/BottomSegment(3)35.png",
+	// Stone Segment Top
+	(char*)"sprite/TopSegment(1)36.png",
+	(char*)"sprite/TopSegment(2)37.png",
+	(char*)"sprite/TopSegment(3)38.png",
+	// Wood
+	(char*)"sprite/MiddleWoodLeft(1)39.png",
+	(char*)"sprite/MiddleWood(2)40.png",
+	(char*)"sprite/MiddleWoodRight(3)41.png",
+	(char*)"sprite/TopWood42.png",
+	(char*)"sprite/BottomWood43.png",
+	// Wood Beam
+	(char*)"sprite/Beam(1)44.png",
+	(char*)"sprite/Beam(2)45.png",
+	(char*)"sprite/Beam(3)46.png",
+	(char*)"sprite/Beam(4)47.png",
+	(char*)"sprite/Beam(5)48.png",
+	// Void
+	(char*)"sprite/Void49.png",
+
 };
 
-char* catMeows[3] = {
+char* playerJump[1] = {
 	(char*)"audio/nes-sfx24.wav",
-	(char*)"audio/nes-sfx26.wav",
-	(char*)"audio/nes-sfx25.wav",
 };
 
 // Gameobject class
@@ -126,12 +186,18 @@ GameObject CreateGround(float x, float y, float width, float height, bool collid
 	return ground;
 }
 
-GameObject ground[200];
+// Platforms and Background Tiles
+GameObject ground[600];
 
-// Collectable object
-GameObject collectible;
+// Collectable object Tiles
+GameObject collectible[10];
 
-GameObject createInvisibleCollider(float x, float y, float width, float height) {
+GameObject hazard;
+
+GameObject mapExit;
+
+GameObject createInvisibleCollider(float x, float y, float width, float height) 
+{
 	GameObject collider;
 	collider.x = x;
 	collider.y = y;
@@ -139,7 +205,7 @@ GameObject createInvisibleCollider(float x, float y, float width, float height) 
 	collider.sizeY = height;
 
 	collider.isSolid = true;
-	collider.canSee = false;
+	collider.canSee = true;
 	collider.colorR = 1.0f;
 	collider.colorG = 0.0f;
 	collider.colorB = 0.0f;
@@ -150,13 +216,23 @@ GameObject createInvisibleCollider(float x, float y, float width, float height) 
 
 // GameObject Helper Functions
 
-void createColumn(char direction, float startX, float startY,
-	int length, int rows, float tileSize,
-	bool collider = true,
-	int startTexIndex = 8,
-	int endTexIndex = -1,
-	bool invisible = false  // <-- NEW PARAMETER
-)
+void createcoffee(float x, float y)
+{
+	collectible[coffeeNum].x = x;
+	collectible[coffeeNum].y = y;
+	collectible[coffeeNum].sizeX = 0.3f;
+	collectible[coffeeNum].sizeY = 0.4f;
+
+	collectible[coffeeNum].isSolid = false;
+	collectible[coffeeNum].canSee = true;
+	collectible[coffeeNum].destroyed = false;
+
+	collectible[coffeeNum].textureIndex = 18; // Example coffee texture index
+
+	coffeeNum++;
+}
+
+void createColumn(char direction, float startX, float startY, int length, int rows, float tileSize, bool collider = true, int startTexIndex = 8, int endTexIndex = -1, bool invisible = false)
 {
 	// If invisible is false, we create visible tiles.
 	// If invisible is true, we skip making visible tiles, but still make the collider if requested.
@@ -235,8 +311,37 @@ void createColumn(char direction, float startX, float startY,
 	}
 }
 
+void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1.0f) 
+{
+	hazard.x = x;
+	hazard.y = y;
+	hazard.sizeX = tileWidth;
+	hazard.sizeY = tileLength;
+	hazard.isSolid = false;					
+	hazard.canSee = true;					// Invisible by default (set true for debugging)
+	hazard.destroyed = false;
+	hazard.textureIndex = -1;				// No texture; using a color if you choose to reveal it.
 
+	// Red Debug
+	hazard.colorR = 1.0f;
+	hazard.colorG = 0.0f;
+	hazard.colorB = 0.0f;
+}
 
+void createMapExit(float x, float y, float tileSize = 1.0f) {
+	mapExit.x = x;
+	mapExit.y = y;
+	mapExit.sizeX = tileSize;
+	mapExit.sizeY = tileSize;
+	mapExit.isSolid = false;
+	mapExit.canSee = true;   // Invisible by default (set to true for debugging)
+	mapExit.destroyed = false;
+	mapExit.textureIndex = -1;
+	// Set debug color (green) if you choose to render it.
+	mapExit.colorR = 0.0f;
+	mapExit.colorG = 1.0f;
+	mapExit.colorB = 0.0f;
+}
 
 
 // Implementing Collision Detection (Used from the platform example)
@@ -263,7 +368,7 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 
 void init(void) {
 	// Clear The Window + Set Color
-	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+	glClearColor((52.0f / 255.0f), (32.0f / 255.0f), (43.0f / 255.0f), 1.0f);
 
 
 	// 2D Projection Setup
@@ -280,91 +385,117 @@ void init(void) {
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
 
-	// Sprite Sheet
-	createColumn('H', -3.5f, 3.0f, 22, 2, 1.0f, false, 1, 22);
-
 	// Floor
-	createColumn('H', -5.5f, -3.0f, 30, 2, 1.0f, true, 12);
-	createColumn('H', -5.5f, 1.0f, 30, 2, 1.0f, true, 11);
+
+	createColumn('H', -5.5f, -2.0f, 30, 1, 1.0f, true, 36);
+
+	createColumn('H', -5.5f, 6.0f, 30, 1, 1.0f, true, 33);
+
+	// Walls
+	createColumn('V', -5.4f, -1.0f, 7, 1, 1.0f, true, 34);
+		createColumn('V', -5.5f, 6.0f, 1, 1, 1.0f, true, 30);
+			createColumn('V', -5.5f, -2.0f, 1, 1, 1.0f, true, 24);
 
 
 	// Background
-	createColumn('H', -4.5f, -1.0f, 6, 2, 1.0f, false , 10, 10);
+	createColumn('V', -4.5f, -1.0f, 7, 30, 1.0f, false, 39);
+
+
+
+
+	// Bounds
+	createColumn('H', -5.5f, -2.95f, 30, 1, 1.0f, true, 48);
+	createColumn('H', -5.5f, 6.95f, 30, 1, 1.0f, true, 48);
+	createColumn('V', -6.2f, -2.0f, 9, 1, 1.0f, true, 48);
 
 
 
 	// Collectable Setup
-	collectible.x = -2.0f;
-	collectible.y = 0.0f;
-	collectible.sizeX = 0.2f;
-	collectible.sizeY = 0.4f;
-	collectible.colorB = 0.0f;
+	createcoffee(7.0f, 1.0f);
+	createcoffee(6.0f, 1.0f);
+	createcoffee(8.0f, 1.0f);
+	createcoffee(9.0f, 1.0f);
+	createcoffee(10.0f, 1.0f);
+	createcoffee(11.0f, 1.0f);
+	createcoffee(12.0f, 1.0f);
+	createcoffee(13.0f, 1.0f);
+	createcoffee(14.0f, 1.0f);
+	createcoffee(15.0f, 1.0f);
+
+
+
+
+	// Win/Lose Objects
+	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Places the hazard at (3.0, -1.0) with size 1.0
+	//createHazard(-5.0, -4.0f, 60.0f, 0.05f);    // Places the hazard at (3.0, -1.0) with size 1.0
+
+	createMapExit(0.0f, 0.0f, 1.0f);
 
 	// Sound System BGM
-	SoundEngine->play2D("audio/track_25.OGG", true);
+	//SoundEngine->play2D("audio/track_25.OGG", true);
+}
+
+void CreateMechanics()
+{
+	// Simply display the timer and coin count without modifying the timer value
+	glColor3f(1.0, 1.0, 1.0);
+	glRasterPos2f(player.x - 9.3f, player.y + 8.0f);
+	string timerText = "Time: " + std::to_string(timeLeft);
+	for (char c : timerText)
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
+
+	glRasterPos2f(player.x - 9.3f, player.y + 7.6f);
+	string coinText = "Coffee: " + to_string(coffeeCollected) + "/" + to_string(totalcoffee);
+	for (char c : coinText)
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
+}
+
+void coffeeAnimationTimer(int value)
+{
+	coffeeAnimFrame = (coffeeAnimFrame + 1) % coffeeAnimFrames;
+	glutPostRedisplay();  // Redraw the scene with the new coffee frame
+	glutTimerFunc(coffeeAnimDelay, coffeeAnimationTimer, 0);  // Schedule next frame update
 }
 
 // Draw Player Character + Colliders
-void CreatePlayer(bool show)
-{
-	glPushMatrix(); // Player Character
-
-	// Draw Player and Size
-	player.sizeX = 1.0f;
-	player.sizeY = 1.0f;
+void CreatePlayer(bool show) {
+	glPushMatrix();
 	player.DrawPlayer(true);
-
-	// Bottom Collision Check
-	// Offesets
-	bottomCheck.x = player.x + player.sizeX * 0.35f;
+	bottomCheck.x = player.x + 0.2;
 	bottomCheck.y = player.y;
-
-	// Size
-	bottomCheck.sizeX = player.sizeX * 0.30f;
-	bottomCheck.sizeY = player.sizeY * 0.05f;
+	bottomCheck.sizeX = 0.6;
+	bottomCheck.sizeY = 0.2;
 
 	bottomCheck.canSee = show;
-	bottomCheck.DrawGameObject(false);
 
-
-	// Top Collision Check
-	// Offesets
-	topCheck.x = player.x + player.sizeX * 0.35f;
-	topCheck.y = player.y + player.sizeY * 0.80f;
-
-	// Size
-	topCheck.sizeX = player.sizeX * 0.30f;
-	topCheck.sizeY = player.sizeY * 0.05f;
-
-	topCheck.canSee = show;
-	topCheck.DrawGameObject(false);
-
-	// Left Collision Check
-	// Offesets
-	leftCheck.x = player.x + player.sizeX * 0.20f;
-	leftCheck.y = player.y + player.sizeY * 0.80f;
-
-	// Size
-	leftCheck.sizeX = player.sizeX * 0.05f;
-	leftCheck.sizeY = -player.sizeY * 0.75f;
+	leftCheck.x = player.x;
+	leftCheck.y = player.y + 0.2;
+	leftCheck.sizeX = 0.2;
+	leftCheck.sizeY = 0.6;
 
 	leftCheck.canSee = show;
-	leftCheck.DrawGameObject(false);
 
-	// Right Collision Check
-	// Offesets
-	rightCheck.x = player.x + player.sizeX * 0.75f;
-	rightCheck.y = player.y + player.sizeY * 0.80f;
-
-	// Size
-	rightCheck.sizeX = player.sizeX * 0.05f;
-	rightCheck.sizeY = -player.sizeY * 0.75f;
+	rightCheck.x = player.x + 0.8;
+	rightCheck.y = player.y + 0.2;
+	rightCheck.sizeX = 0.2;
+	rightCheck.sizeY = 0.6;
 
 	rightCheck.canSee = show;
-	rightCheck.DrawGameObject(false);
 
+	topCheck.x = player.x + 0.2;
+	topCheck.y = player.y + 0.8;
+	topCheck.sizeX = 0.6;
+	topCheck.sizeY = 0.2;
+
+	topCheck.canSee = show;
+
+	bottomCheck.DrawGameObject(false);
+	leftCheck.DrawGameObject(false);
+	rightCheck.DrawGameObject(false);
+	topCheck.DrawGameObject(false);
 	glPopMatrix();
 }
+
 // ========================================================================================================================================================================
 // Environment Logic
 
@@ -428,10 +559,10 @@ void MyDisplay() {
 
 	if (pausedState) {
 		glColor3f(1.0, 1.0, 1.0);
-		glRasterPos2f(player.x - 1, player.y);
-		const char* message = "GAME PAUSED" "- Press P to Resume";
+		glRasterPos2f(player.x - 1.8, player.y + 1);
+		const char* message = "GAME PAUSED" " - Press P to Resume";
 		for (int i = 0; message[i] != '\0'; i++) {
-			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
 		glutSwapBuffers();
 		return;
@@ -439,10 +570,10 @@ void MyDisplay() {
 
 	if (gameOverState) {
 		glColor3f(1.0, 1.0, 1.0);
-		glRasterPos2f(player.x - 1, player.y + 1);
+		glRasterPos2f(player.x - 0.8f, player.y + 1);
 		const char* message = "GAME OVER!";
 		for (int i = 0; message[i] != '\0'; i++) {
-			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
 		glutSwapBuffers();
 		return;
@@ -450,19 +581,23 @@ void MyDisplay() {
 
 	if (winState) {
 		glColor3f(0.0, 1.0, 0.0);
-		glRasterPos2f(player.x - 1, player.y);
+		glRasterPos2f(player.x - 0.6f, player.y + 1);
 		const char* message = "YOU WIN!";
 		for (int i = 0; message[i] != '\0'; i++) {
-			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, message[i]);
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
 		glutSwapBuffers();
 		return;
 	}
 
 
-	// Update camera position (smooth follow effect)
+	// Update camera position
 	cameraX = player.x + player.sizeX / 2 + cameraOffsetX;
 	cameraY = player.y + player.sizeY / 2 + cameraOffsetY;
+	if (player.y == -3.0f)
+	{
+		cameraY = -3.0f;
+	}
 
 	// Set view matrix to follow the player
 	glMatrixMode(GL_MODELVIEW);
@@ -480,50 +615,36 @@ void MyDisplay() {
 	// Draws the player (with or without collision visualized)
 	CreatePlayer(showCollision);
 
-	// 2) Draw collidable objects next
-	for (int i = 0; i < groundNum; i++) {
-		if (ground[i].isSolid) {
-			ground[i].DrawGameObject(true);
+	for (int i = 0; i < coffeeNum; i++)
+	{
+		if (!collectible[i].destroyed)
+		{
+			collectible[i].DrawGameObject(true);  // Draw coffee with texture
+			if (CheckCollision(player, collectible[i]))
+			{
+				collectible[i].destroyed = true;
+				coffeeCollected++;
+			}
 		}
 	}
 
 
+	hazard.DrawGameObject(false);
+	mapExit.DrawGameObject(false);
 
+	if (CheckCollision(player, hazard)) {
+		gameOverState = true;
+	}
 
-
-
-
-
-	// Draw the collectible
-	collectible.DrawGameObject(false);
-
-
-	// Removes the collectible when Touched by Player
-	if (CheckCollision(player, collectible))
-	{
-		collectible.destroyed = true; // Check collision Skipped
+	if (CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee) {
 		winState = true;
 	}
 
-
-
 	// Enable Rules:
+	CreateMechanics();
 
 	// Apply Gravity + Collision
 	gravityCheck();
-
-	// Timer
-	glColor3f(1.0, 1.0, 1.0);
-	glRasterPos2f(player.x - 0.2f, player.y + 0.8f);
-	string timerText = "Time: " + std::to_string(timeLeft);
-	for (char c : timerText)
-		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, c);
-
-	// Then the coin line (lower on the screen, or different offset)
-	glRasterPos2f(player.x - 0.2f, player.y + 0.6f);
-	string coinText = "Coins: " + to_string(coinsCollected) + "/" + to_string(totalCoins);
-	for (char c : coinText)
-		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, c);
 
 	// Apply Player Movement Logic
 	if (lt)
@@ -548,11 +669,16 @@ void specialKeyboard(int key, int x, int y) {
 	case GLUT_KEY_LEFT:
 		lt = true;
 		rt = false;
+		currentState = RUN_LEFT;
+		winState = true;
+		facingLeft = true;
 		break;
 
 	case GLUT_KEY_RIGHT:
 		lt = false;
 		rt = true;
+		currentState = RUN_RIGHT;
+		facingLeft = false;
 		break;
 	}
 
@@ -564,9 +690,18 @@ void specialKeyboardRelease(int key, int x, int y) {
 	switch (key) {
 	case GLUT_KEY_LEFT:
 		lt = false;
+		if (currentState == RUN_LEFT) 
+		{
+			currentState = IDLE_LEFT;
+			animFrameIndex = 0; // reset run frames
+		}
 		break;
 	case GLUT_KEY_RIGHT:
 		rt = false;
+		if (currentState == RUN_RIGHT) {
+			currentState = IDLE_RIGHT;
+			animFrameIndex = 0;
+		}
 		break;
 	}
 }
@@ -579,9 +714,15 @@ void Keyboard(unsigned char key, int x, int y)
 		showCollision = !showCollision;
 		break;
 	case 32: // Spacebar
-		if (onGround) {
-			SoundEngine->play2D(catMeows[1], false);
+		if (onGround && !jump) {
 			jump = true;
+			// If last facing direction was left => JUMP_LEFT
+			if (facingLeft) {
+				currentState = JUMP_LEFT;
+			}
+			else {
+				currentState = JUMP_RIGHT;
+			}
 		}
 		break;
 
@@ -603,8 +744,8 @@ void Keyboard(unsigned char key, int x, int y)
 
 void loadTextures() {
 	int i;
-	glGenTextures(22, texID); // Get the texture object IDs (Reserve IDs)
-	for (i = 0; i < 22; i++) {
+	glGenTextures(49, texID); // Get the texture object IDs (Reserve IDs)
+	for (i = 0; i < 49; i++) {
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
 		if (format == FIF_UNKNOWN) {
@@ -640,75 +781,154 @@ void loadTextures() {
 }
 
 // ========================================================================================================================================================================
-// Global Timer
 
-void timer(int v)
-{
-	frame++;
 
-	if (frame >= 6) {
-		frame = 0;
-	}
 
+void updateAnimationFrame() {
+	// If the player is jumping, use a special frame or frames
 	if (jump) {
-		if (jumpTimer > 0) {
-			// Temporary copies to show how velocity changes 
-			float jumpAccelerationTemp = jumpAcceleration;
-			float jumpVelocityTemp = jumpVelocity;
-
-			// Move player up
-			player.y += jumpVelocityTemp;
-			// Reduce velocity over time
-			jumpVelocityTemp -= jumpAccelerationTemp;
-
-			jumpTimer--;
+		// If you want separate left/right jump frames:
+		if (facingLeft) {
+			// example: pick frame 14 for jump-left
+			displayFrame = 14;
 		}
 		else {
-			// Reset jump
-			jump = false;
-			jumpTimer = resetJumpTimer;
+			// example: pick frame 15 for jump-right
+			displayFrame = 15;
 		}
+		return;
 	}
 
-	glutPostRedisplay();
-	glutTimerFunc(100, timer, v); // Adjust frame delay based on FPS
+	// Otherwise, pick frames based on currentState:
+	switch (currentState) {
+	case RUN_LEFT:
+		// frames [0..7] for running left
+		// animFrameIndex cycles 0..7
+		displayFrame = animFrameIndex;
+		break;
+
+	case IDLE_LEFT:
+		// single frame = 8
+		displayFrame = 8;
+		break;
+
+	case RUN_RIGHT:
+		// frames [9..16] for running right
+		displayFrame = 9 + animFrameIndex;
+		break;
+
+	case IDLE_RIGHT:
+		// single frame = 17
+		displayFrame = 17;
+		break;
+
+	default:
+		// fallback
+		displayFrame = 8;
+		break;
+	}
 }
 
-void collectionTimer(int v) {
-	if (!pausedState && !gameOverState && !winState) {
+void cycleRunFrames() {
+	// If RUN_LEFT, cycle 0..7
+	if (currentState == RUN_LEFT) {
+		animFrameIndex++;
+		if (animFrameIndex > 7) animFrameIndex = 0;
+	}
+	// If RUN_RIGHT, cycle 0..7 (added offset in updateAnimationFrame)
+	else if (currentState == RUN_RIGHT) {
+		animFrameIndex++;
+		if (animFrameIndex > 7) animFrameIndex = 0;
+	}
+	// Idle states don't cycle
+	// Jump states we override frame anyway
+}
+
+// Global Timer
+void timer(int v)
+{
+	// If paused, game over, or win, just schedule the next call.
+	if (pausedState || gameOverState || winState) {
+		glutTimerFunc(100, timer, 0);
+		return;
+	}
+
+	// Accumulate elapsed time (100ms per timer callback)
+	static int gameTimerAccumulator = 0;
+	gameTimerAccumulator += 100;
+	if (gameTimerAccumulator >= 1000) {
 		timeLeft--;
+		gameTimerAccumulator = 0;
 		if (timeLeft <= 0) {
 			gameOverState = true;
 		}
 	}
+
+	// --- Jump and Animation Logic ---
+	if (jump)
+	{
+		if (jumpTimer > 0)
+		{
+			if (lt) {
+				currentState = JUMP_LEFT;
+				facingLeft = true;
+			}
+			else if (rt) {
+				currentState = JUMP_RIGHT;
+				facingLeft = false;
+			}
+			player.y += jumpVelocity;
+			jumpVelocity -= jumpAcceleration;
+			jumpTimer--;
+		}
+		else
+		{
+			jump = false;
+			jumpTimer = resetJumpTimer;
+			jumpVelocity = 0.8f;
+			if (lt) {
+				currentState = RUN_LEFT;
+			}
+			else if (rt) {
+				currentState = RUN_RIGHT;
+			}
+			else {
+				currentState = facingLeft ? IDLE_LEFT : IDLE_RIGHT;
+			}
+		}
+	}
+
+	cycleRunFrames();
+	updateAnimationFrame();
+
 	glutPostRedisplay();
-	glutTimerFunc(1000, timer, 0); // Call every second
+	glutTimerFunc(100, timer, 0); // schedule next update in 100ms
 }
 
 // ========================================================================================================================================================================
 // Main
 
 int main(int argc, char** argv) {
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGB); // RGB mode
-	glutInitWindowSize(WIN_W, WIN_H); // window size
-	glutInitWindowPosition(WIN_X, WIN_Y);
-	glutCreateWindow("Platform Example");
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_RGB); // RGB mode
+    glutInitWindowSize(WIN_W, WIN_H); // window size
+    glutInitWindowPosition(WIN_X, WIN_Y);
+    glutCreateWindow("Platform Example");
 
-	glutTimerFunc(0, timer, 0);
-
-	init();
-
-	loadTextures();
-
-	glutDisplayFunc(MyDisplay); // call the drawing function
-
-	glutKeyboardFunc(Keyboard);
-	glutSpecialFunc(specialKeyboard);
-	glutSpecialUpFunc(specialKeyboardRelease);
-
-	glutMainLoop();
-	return 0;
+    // Start the coffee animation timer
+    glutTimerFunc(coffeeAnimDelay, coffeeAnimationTimer, 0);
+    
+    glutTimerFunc(0, timer, 0);
+    init();
+    loadTextures();
+    
+    glutDisplayFunc(MyDisplay); // Drawing function
+    glutKeyboardFunc(Keyboard);
+    glutSpecialFunc(specialKeyboard);
+    glutSpecialUpFunc(specialKeyboardRelease);
+    
+    glutMainLoop();
+    return 0;
 }
 
 // ========================================================================================================================================================================
@@ -739,8 +959,12 @@ void GameObject::DrawGameObject(bool sprite)
 
 			glEnable(GL_TEXTURE_2D); // Enable texturing
 
-			// Use the current frame for animation or [x] set number
-			glBindTexture(GL_TEXTURE_2D, texID[textureIndex]); // Which texture
+			if (textureIndex == 18) { // If it's a coffee
+				glBindTexture(GL_TEXTURE_2D, texID[18 + coffeeAnimFrame]);
+			}
+			else {
+				glBindTexture(GL_TEXTURE_2D, texID[textureIndex]);
+			}
 
 			glBegin(GL_POLYGON);
 			glTexCoord2f(0.0, 0.0);
@@ -784,7 +1008,7 @@ void GameObject::DrawPlayer(bool sprite)
 
 			glEnable(GL_TEXTURE_2D); // Enable texturing
 
-			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+			glBindTexture(GL_TEXTURE_2D, texID[displayFrame]); // Which texture
 
 			glBegin(GL_POLYGON);
 			glTexCoord2f(0.0, 0.0);
@@ -814,4 +1038,3 @@ void GameObject::DrawPlayer(bool sprite)
 
 	glPopMatrix();
 }
-
