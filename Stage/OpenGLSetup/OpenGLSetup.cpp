@@ -36,27 +36,33 @@ bool lt, rt, jump, contact, onGround;
 // Mechanics
 int totalcoffee = 10;
 int coffeeCollected = 0;
+static int timeLeft = 60;
 
 // Game States
-bool pausedState = false;
-bool menuState = true;
-bool gameOverState = false;
-bool winState = false;
-static int timeLeft = 60; // Start with 60 seconds
+enum Scenes
+{
+	MenuScene,
+	GameScene,
+	LoseScene,
+	WinScene,
+	PauseScene
+};
+
+Scenes currentScene = MenuScene;
 
 // Player States
 enum PlayerState
 {
-	IDLE_LEFT,
-	RUN_LEFT,
-	IDLE_RIGHT,
-	RUN_RIGHT,
-	JUMP_LEFT,
-	JUMP_RIGHT
+	IdleLeft,
+	RunLeft,
+	IdleRight,
+	RunRight,
+	JumpLeft,
+	JumpRight
 };
 
 
-PlayerState currentState = IDLE_RIGHT;  // Start facing right, idle
+PlayerState currentState = IdleRight;  // Start facing right, idle
 int animFrameIndex = 0;                 // For cycling run frames
 bool facingLeft = false;                // Track last facing direction
 
@@ -137,8 +143,20 @@ char* textureFileNames[49] = {	// File names for the files from which texture im
 
 };
 
-char* playerJump[1] = {
+char* backgroundMusic[4] =
+{
+	// Sound System BGM
+	//SoundEngine->play2D("audio/Game.mp3", true);
+	(char*)"audio/Menu.mp3",
+	(char*)"audio/Game.mp3",
+	(char*)"audio/Lose.mp3",
+	(char*)"audio/Win.mp3"
+};
+
+char* sfxQueue[2] = 
+{
 	(char*)"audio/nes-sfx24.wav",
+	(char*)"audio/nes-sfx24.wav"
 };
 
 // Gameobject class
@@ -343,6 +361,26 @@ void createMapExit(float x, float y, float tileSize = 1.0f) {
 	mapExit.colorB = 0.0f;
 }
 
+// Sound Library
+void playMenuMusic() {
+	SoundEngine->stopAllSounds();
+	SoundEngine->play2D(backgroundMusic[0], true);
+}
+
+void playGameMusic() {
+	SoundEngine->stopAllSounds();
+	SoundEngine->play2D(backgroundMusic[1], true);
+}
+
+void playLoseMusic() {
+	SoundEngine->stopAllSounds();
+	SoundEngine->play2D(backgroundMusic[2], false);
+}
+
+void playWinMusic() {
+	SoundEngine->stopAllSounds();
+	SoundEngine->play2D(backgroundMusic[3], false);
+}
 
 // Implementing Collision Detection (Used from the platform example)
 bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
@@ -378,6 +416,8 @@ void init(void) {
 
 	// Prepare jump timer
 	resetJumpTimer = jumpTimer;
+
+	playMenuMusic();
 
 	// Give collision check boxes a color
 	bottomCheck.colorR = 0;
@@ -431,8 +471,8 @@ void init(void) {
 
 	createMapExit(0.0f, 0.0f, 1.0f);
 
-	// Sound System BGM
-	//SoundEngine->play2D("audio/track_25.OGG", true);
+
+
 }
 
 void CreateMechanics()
@@ -444,8 +484,8 @@ void CreateMechanics()
 	for (char c : timerText)
 		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
 
-	glRasterPos2f(player.x - 9.3f, player.y + 7.6f);
-	string coinText = "Coffee: " + to_string(coffeeCollected) + "/" + to_string(totalcoffee);
+	glRasterPos2f(player.x + 8.3f, player.y + 8.0f);
+	string coinText = "Espresso: " + to_string(coffeeCollected) + "/" + to_string(totalcoffee);
 	for (char c : coinText)
 		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
 }
@@ -543,7 +583,7 @@ void gravityCheck() {
 	}
 
 	if (player.y < -10.0) { // Out of bounds check
-		gameOverState = true;
+		currentScene = LoseScene;
 	}
 
 
@@ -557,29 +597,73 @@ void MyDisplay() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	// Clear the screen
 
-	if (pausedState) {
+
+	if (currentScene == MenuScene) {
 		glColor3f(1.0, 1.0, 1.0);
-		glRasterPos2f(player.x - 1.8, player.y + 1);
-		const char* message = "GAME PAUSED" " - Press P to Resume";
-		for (int i = 0; message[i] != '\0'; i++) {
-			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
+		// Draw the large title text
+		glRasterPos2f(-5.0f, 2.0f); // Adjust as needed for centering
+		const char* title = "Caffeine Crusader";
+		for (int i = 0; title[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, title[i]);
+		}
+		// Draw the smaller instruction text below the title
+		glRasterPos2f(-3.0f, 0.0f); // Adjust position as needed
+		const char* menuMsg = "Press G to Start";
+		for (int i = 0; menuMsg[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuMsg[i]);
+		}
+		// Draw the smaller instruction text below the title
+		glRasterPos2f(-3.0f, -1.0f); // Adjust position as needed
+		const char* menuDescripiton = "Collect all 10 Espresso Shots and return before the clock hits 0";
+		for (int i = 0; menuDescripiton[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuDescripiton[i]);
+		}
+		// Draw the smaller instruction text below the title
+		glRasterPos2f(-3.0f, -2.0f); // Adjust position as needed
+		const char* menuComment = "Feed your addiction before you crash!";
+		for (int i = 0; menuComment[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuComment[i]);
 		}
 		glutSwapBuffers();
 		return;
 	}
 
-	if (gameOverState) {
+	// Pause Scene: Display pause message and instruction.
+	else if (currentScene == PauseScene) {
+		glColor3f(1.0, 1.0, 1.0);
+		// Display large pause title
+		glRasterPos2f(player.x - 2.0f, player.y + 1.5f);
+		const char* pauseTitle = "GAME PAUSED";
+		for (int i = 0; pauseTitle[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pauseTitle[i]);
+		}
+		// Display smaller resume instruction below
+		glRasterPos2f(player.x - 1.8f, player.y + 1.0f);
+		const char* pauseMsg = "- Press P to Resume";
+		for (int i = 0; pauseMsg[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pauseMsg[i]);
+		}
+		glutSwapBuffers();
+		return;
+	}
+
+	else if (currentScene == LoseScene) {
 		glColor3f(1.0, 1.0, 1.0);
 		glRasterPos2f(player.x - 0.8f, player.y + 1);
 		const char* message = "GAME OVER!";
 		for (int i = 0; message[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
+		glRasterPos2f(player.x - 0.8f, player.y - 1); // Adjust position as needed
+		const char* gameOverMsg = "Too eepy :(";
+		for (int i = 0; gameOverMsg[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, gameOverMsg[i]);
+		}
 		glutSwapBuffers();
 		return;
 	}
 
-	if (winState) {
+	else if (currentScene == WinScene) {
 		glColor3f(0.0, 1.0, 0.0);
 		glRasterPos2f(player.x - 0.6f, player.y + 1);
 		const char* message = "YOU WIN!";
@@ -590,6 +674,13 @@ void MyDisplay() {
 		return;
 	}
 
+	// Object Spawn
+
+	for (int i = 0; i < groundNum; i++) {
+		if (!ground[i].isSolid) {
+			ground[i].DrawGameObject(true);
+		}
+	}
 
 	// Update camera position
 	cameraX = player.x + player.sizeX / 2 + cameraOffsetX;
@@ -605,12 +696,6 @@ void MyDisplay() {
 	gluLookAt(cameraX, cameraY, 5,		// Camera position (x, y, z)
 		cameraX, cameraY, 0,			// Looking at (player)
 		0, 1, 0);						// Up vector (y-axis)
-
-	for (int i = 0; i < groundNum; i++) {
-		if (!ground[i].isSolid) {
-			ground[i].DrawGameObject(true);
-		}
-	}
 
 	// Draws the player (with or without collision visualized)
 	CreatePlayer(showCollision);
@@ -633,11 +718,13 @@ void MyDisplay() {
 	mapExit.DrawGameObject(false);
 
 	if (CheckCollision(player, hazard)) {
-		gameOverState = true;
+		currentScene = LoseScene;
+		playLoseMusic();
 	}
 
 	if (CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee) {
-		winState = true;
+		currentScene = WinScene;
+		playWinMusic();
 	}
 
 	// Enable Rules:
@@ -669,15 +756,14 @@ void specialKeyboard(int key, int x, int y) {
 	case GLUT_KEY_LEFT:
 		lt = true;
 		rt = false;
-		currentState = RUN_LEFT;
-		winState = true;
+		currentState = RunLeft;
 		facingLeft = true;
 		break;
 
 	case GLUT_KEY_RIGHT:
 		lt = false;
 		rt = true;
-		currentState = RUN_RIGHT;
+		currentState = RunRight;
 		facingLeft = false;
 		break;
 	}
@@ -690,51 +776,52 @@ void specialKeyboardRelease(int key, int x, int y) {
 	switch (key) {
 	case GLUT_KEY_LEFT:
 		lt = false;
-		if (currentState == RUN_LEFT) 
+		if (currentState == RunLeft) 
 		{
-			currentState = IDLE_LEFT;
+			currentState = IdleLeft;
 			animFrameIndex = 0; // reset run frames
 		}
 		break;
 	case GLUT_KEY_RIGHT:
 		rt = false;
-		if (currentState == RUN_RIGHT) {
-			currentState = IDLE_RIGHT;
+		if (currentState == RunRight) {
+			currentState = IdleRight;
 			animFrameIndex = 0;
 		}
 		break;
 	}
 }
 
-void Keyboard(unsigned char key, int x, int y)
-{
-	switch (key)
-	{
-	case 's': // Show ground check
+void Keyboard(unsigned char key, int x, int y) {
+	switch (key) {
+	case 's':
 		showCollision = !showCollision;
 		break;
-	case 32: // Spacebar
-		if (onGround && !jump) {
+	case 32: // Spacebar for jump (only in GameScene)
+		if (currentScene == GameScene && onGround && !jump) {
 			jump = true;
-			// If last facing direction was left => JUMP_LEFT
-			if (facingLeft) {
-				currentState = JUMP_LEFT;
-			}
-			else {
-				currentState = JUMP_RIGHT;
-			}
+			currentState = facingLeft ? JumpLeft : JumpRight;
 		}
 		break;
-
-	case 'p': // Toggle Pause
-		pausedState = !pausedState;
+	case 'e':
+		if (currentScene == MenuScene) {
+			currentScene = GameScene;
+			playGameMusic();
+		}
 		break;
-
-	case 27: // escape
+	case 'p': // Toggle Pause
+		if (currentScene == GameScene) {
+			currentScene = PauseScene;
+			SoundEngine->setAllSoundsPaused(true);
+		}
+		else if (currentScene == PauseScene) {
+			currentScene = GameScene;
+			SoundEngine->setAllSoundsPaused(false);
+		}
+		break;
+	case 27: // Escape key
 		exit(0);
 	}
-
-
 	glutPostRedisplay();
 }
 
@@ -783,7 +870,6 @@ void loadTextures() {
 // ========================================================================================================================================================================
 
 
-
 void updateAnimationFrame() {
 	// If the player is jumping, use a special frame or frames
 	if (jump) {
@@ -801,23 +887,23 @@ void updateAnimationFrame() {
 
 	// Otherwise, pick frames based on currentState:
 	switch (currentState) {
-	case RUN_LEFT:
+	case RunLeft:
 		// frames [0..7] for running left
 		// animFrameIndex cycles 0..7
 		displayFrame = animFrameIndex;
 		break;
 
-	case IDLE_LEFT:
+	case IdleLeft:
 		// single frame = 8
 		displayFrame = 8;
 		break;
 
-	case RUN_RIGHT:
+	case RunRight:
 		// frames [9..16] for running right
 		displayFrame = 9 + animFrameIndex;
 		break;
 
-	case IDLE_RIGHT:
+	case IdleRight:
 		// single frame = 17
 		displayFrame = 17;
 		break;
@@ -830,13 +916,13 @@ void updateAnimationFrame() {
 }
 
 void cycleRunFrames() {
-	// If RUN_LEFT, cycle 0..7
-	if (currentState == RUN_LEFT) {
+	// If RunLeft, cycle 0..7
+	if (currentState == RunLeft) {
 		animFrameIndex++;
 		if (animFrameIndex > 7) animFrameIndex = 0;
 	}
-	// If RUN_RIGHT, cycle 0..7 (added offset in updateAnimationFrame)
-	else if (currentState == RUN_RIGHT) {
+	// If RunRight, cycle 0..7 (added offset in updateAnimationFrame)
+	else if (currentState == RunRight) {
 		animFrameIndex++;
 		if (animFrameIndex > 7) animFrameIndex = 0;
 	}
@@ -845,64 +931,48 @@ void cycleRunFrames() {
 }
 
 // Global Timer
-void timer(int v)
-{
-	// If paused, game over, or win, just schedule the next call.
-	if (pausedState || gameOverState || winState) {
+void timer(int v) {
+	// Only update the game timer when in GameScene.
+	if (currentScene == MenuScene || currentScene == PauseScene || currentScene == LoseScene || currentScene == WinScene) {
 		glutTimerFunc(100, timer, 0);
 		return;
 	}
 
-	// Accumulate elapsed time (100ms per timer callback)
 	static int gameTimerAccumulator = 0;
 	gameTimerAccumulator += 100;
 	if (gameTimerAccumulator >= 1000) {
 		timeLeft--;
 		gameTimerAccumulator = 0;
 		if (timeLeft <= 0) {
-			gameOverState = true;
+			currentScene = LoseScene;
+			playLoseMusic();
 		}
 	}
-
-	// --- Jump and Animation Logic ---
-	if (jump)
-	{
-		if (jumpTimer > 0)
-		{
+	if (jump) {
+		if (jumpTimer > 0) {
 			if (lt) {
-				currentState = JUMP_LEFT;
+				currentState = JumpLeft;
 				facingLeft = true;
 			}
 			else if (rt) {
-				currentState = JUMP_RIGHT;
+				currentState = JumpRight;
 				facingLeft = false;
 			}
 			player.y += jumpVelocity;
 			jumpVelocity -= jumpAcceleration;
 			jumpTimer--;
 		}
-		else
-		{
+		else {
 			jump = false;
 			jumpTimer = resetJumpTimer;
 			jumpVelocity = 0.8f;
-			if (lt) {
-				currentState = RUN_LEFT;
-			}
-			else if (rt) {
-				currentState = RUN_RIGHT;
-			}
-			else {
-				currentState = facingLeft ? IDLE_LEFT : IDLE_RIGHT;
-			}
+			currentState = (lt ? RunLeft : (rt ? RunRight : (facingLeft ? IdleLeft : IdleRight)));
 		}
 	}
-
 	cycleRunFrames();
 	updateAnimationFrame();
-
 	glutPostRedisplay();
-	glutTimerFunc(100, timer, 0); // schedule next update in 100ms
+	glutTimerFunc(100, timer, 0);
 }
 
 // ========================================================================================================================================================================
