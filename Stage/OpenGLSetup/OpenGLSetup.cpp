@@ -75,9 +75,9 @@ int coffeeAnimDelay = 200;    // Milliseconds per frame
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
-GLuint texID[49]; // Texture ID's for the four textures.
+GLuint texID[70]; // Texture ID's for the four textures.
 
-char* textureFileNames[49] = {	// File names for the files from which texture images are loaded
+char* textureFileNames[70] = {	// File names for the files from which texture images are loaded
 	// Knight
 	(char*)"sprite/KnightLeft1.png",
 	(char*)"sprite/KnightLeft2.png",
@@ -140,7 +140,31 @@ char* textureFileNames[49] = {	// File names for the files from which texture im
 	(char*)"sprite/Beam(5)48.png",
 	// Void
 	(char*)"sprite/Void49.png",
+	// Props
+	(char*)"sprite/Door(1)50.png",
+	(char*)"sprite/Door(2)51.png",
 
+	(char*)"sprite/StonePlatform(1)52.png",
+	(char*)"sprite/StonePlatform(2)53.png",
+	(char*)"sprite/StonePlatform(3)54.png",
+
+	(char*)"sprite/Crate55.png",
+
+	(char*)"sprite/Medo(1)56.png",
+	(char*)"sprite/Medo(2)57.png",
+	(char*)"sprite/Medo(3)58.png",
+	(char*)"sprite/Medo(4)59.png",
+	(char*)"sprite/Medo(5)60.png",
+	(char*)"sprite/Medo(6)61.png",
+	(char*)"sprite/Medo(7)62.png",
+	(char*)"sprite/Medo(8)63.png",
+	(char*)"sprite/Medo(9)64.png",
+	(char*)"sprite/Medo(10)65.png",
+	(char*)"sprite/Medo(11)66.png",
+	(char*)"sprite/Medo(12)67.png",
+	(char*)"sprite/Medo(13)68.png",
+	(char*)"sprite/Medo(14)69.png",
+	(char*)"sprite/Medo(15)70.png",
 };
 
 char* backgroundMusic[4] =
@@ -205,7 +229,7 @@ GameObject CreateGround(float x, float y, float width, float height, bool collid
 }
 
 // Platforms and Background Tiles
-GameObject ground[600];
+GameObject ground[1000];
 
 // Collectable object Tiles
 GameObject collectible[10];
@@ -336,9 +360,9 @@ void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1
 	hazard.sizeX = tileWidth;
 	hazard.sizeY = tileLength;
 	hazard.isSolid = false;					
-	hazard.canSee = true;					// Invisible by default (set true for debugging)
+	hazard.canSee = false;					
 	hazard.destroyed = false;
-	hazard.textureIndex = -1;				// No texture; using a color if you choose to reveal it.
+	hazard.textureIndex = -1;			
 
 	// Red Debug
 	hazard.colorR = 1.0f;
@@ -346,13 +370,13 @@ void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1
 	hazard.colorB = 0.0f;
 }
 
-void createMapExit(float x, float y, float tileSize = 1.0f) {
+void createMapExit(float x, float y, float tileSize = 1.0f, bool visible = false) {
 	mapExit.x = x;
 	mapExit.y = y;
 	mapExit.sizeX = tileSize;
 	mapExit.sizeY = tileSize;
 	mapExit.isSolid = false;
-	mapExit.canSee = true;   // Invisible by default (set to true for debugging)
+	mapExit.canSee = visible;
 	mapExit.destroyed = false;
 	mapExit.textureIndex = -1;
 	// Set debug color (green) if you choose to render it.
@@ -417,6 +441,8 @@ void init(void) {
 	// Prepare jump timer
 	resetJumpTimer = jumpTimer;
 
+	player.x = -4.5f;
+
 	playMenuMusic();
 
 	// Give collision check boxes a color
@@ -427,7 +453,8 @@ void init(void) {
 
 	// Floor
 
-	createColumn('H', -5.5f, -2.0f, 30, 1, 1.0f, true, 36);
+	createColumn('H', -5.5f, -2.0f, 8, 1, 1.0f, true, 36);
+	createColumn('H', 4.0f, -2.0f, 20, 1, 1.0f, true, 36);
 
 	createColumn('H', -5.5f, 6.0f, 30, 1, 1.0f, true, 33);
 
@@ -439,37 +466,86 @@ void init(void) {
 
 	// Background
 	createColumn('V', -4.5f, -1.0f, 7, 30, 1.0f, false, 39);
+	createColumn('H', 34, 0.0f, 5, 5, 1.0f, false, 39);	// Secret Room
+		// Door
+		createColumn('V', -4.5f, -1.0f, 2, 1, 1.0f, false, 49, 50);
 
+	// Crates
+		createColumn('H', -1.5f, -1.0f, 2, 1, 1.0f, true, 54);
+		createColumn('V', 0.0f, 0.0f, 1, 2, 1.0f, true, 54);
+		createColumn('V', 0.5f, -1.0f, 1,2, 1.0f, true, 54);
 
+		// Stairs
+			createColumn('V', 3.8f, -1.0f, 1, 1, 1.0f, true, 54);
+			createColumn('V', 4.8f, -1.0f, 2, 1, 1.0f, true, 54);
+			createColumn('V', 5.8f, -1.0f, 3, 1, 1.0f, true, 54);
+			createColumn('V', 6.8f, -1.0f, 4, 1, 1.0f, true, 54);
+		
+		// Stacks
+			createColumn('V', 7.8f, 0.0f, 4, 1, 1.0f, true, 54);
+			createColumn('V', 9.8f, 0.0f, 3, 1, 1.0f, true, 54);
+			createColumn('V', 11.8f, 0.0f, 2, 1, 1.0f, true, 54);
+			createColumn('V', 13.8f, 0.0f, 1, 1, 1.0f, true, 54);
+			createColumn('V', 15.8f, -1.0f, 1, 1, 1.0f, true, 54);
+		
+		// Path Out
+			createColumn('H', 7.8f, -1.0f, 7, 1, 1.0f, false, 54);
+		
+		
+		// Cluttered Boxes
+			createColumn('H', 18.0f, -1.0f, 20, 1, 1.0f, true, 54); // Floor
+			createColumn('H', 18.8f, 1.0f, 16, 3, 1.0f, true, 54);  // Upper Regions
+			createColumn('H', 20.0f, 4.0f, 15, 1, 1.0f, true, 54);
+			createColumn('H', 21.0f, 5.0f, 17, 1, 1.0f, true, 54);
+			createColumn('H', 24.0f, 6.0f, 15, 1, 1.0f, true, 54);
+			createColumn('H', 25.0f, 7.0f, 13, 1, 1.0f, true, 54);
+			createColumn('H', 26.0f, 8.0f, 14, 1, 1.0f, true, 54);
+
+		// Wall Block
+			createColumn('V', 38.0f, -5.0f, 16, 10, 1.0f, true, 54);
+
+		// Lower Layering
+			createColumn('H', 24.0f, -2.0f, 14, 1, 1.0f, true, 54);
+			createColumn('H', 25.0f, -3.0f, 13, 1, 1.0f, true, 54);
+			createColumn('H', 26.0f, -4.0f, 12, 1, 1.0f, true, 54);
+			createColumn('H', 27.0f, -5.0f, 11, 1, 1.0f, true, 54);
+
+		// Secret Path
+			createColumn('H', 18.8f, 0.0f, 16, 1, 1.0f, false , 54); 
+
+		// Medo :3
+			createColumn('H', 35, 2.0f, 4, 1, 1.0f, false, 55, 58);
+			createColumn('H', 35, 1.0f, 4, 1, 1.0f, false, 59, 62);
+			createColumn('H', 35, 0.0f, 4, 1, 1.0f, false, 63, 66);
+			createColumn('H', 35, -1.0f, 3, 1, 1.0f, false, 67, 69);
 
 
 	// Bounds
-	createColumn('H', -5.5f, -2.95f, 30, 1, 1.0f, true, 48);
-	createColumn('H', -5.5f, 6.95f, 30, 1, 1.0f, true, 48);
-	createColumn('V', -6.2f, -2.0f, 9, 1, 1.0f, true, 48);
+	createColumn('H', -5.5f, -2.95f, 30, 1, 1.0f, false, 48);
+	createColumn('H', -5.5f, 6.95f, 30, 1, 1.0f, false, 48);
+	createColumn('V', -6.2f, -2.0f, 9, 1, 1.0f, false, 48);
 
 
 
 	// Collectable Setup
-	createcoffee(7.0f, 1.0f);
-	createcoffee(6.0f, 1.0f);
-	createcoffee(8.0f, 1.0f);
-	createcoffee(9.0f, 1.0f);
-	createcoffee(10.0f, 1.0f);
-	createcoffee(11.0f, 1.0f);
-	createcoffee(12.0f, 1.0f);
-	createcoffee(13.0f, 1.0f);
-	createcoffee(14.0f, 1.0f);
-	createcoffee(15.0f, 1.0f);
+	createcoffee(1.2f, 1.2f);  // 1
+	createcoffee(3.3f, 0.6f);  // 2
+	createcoffee(6.2f, 4.0f);  // 3
+	createcoffee(8.2f, 5.0f);  // 4
+	createcoffee(10.2f, 4.0f); // 5
+	createcoffee(12.2f, 4.0f); // 6
+	createcoffee(14.2f, 2.0f); // 7 
+	createcoffee(15.2f, 3.0f); // 8
+	createcoffee(16.2f, 1.5f); // 9
+	createcoffee(17.4f, 1.0f); // 10
+
 
 
 
 
 	// Win/Lose Objects
-	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Places the hazard at (3.0, -1.0) with size 1.0
-	//createHazard(-5.0, -4.0f, 60.0f, 0.05f);    // Places the hazard at (3.0, -1.0) with size 1.0
-
-	createMapExit(0.0f, 0.0f, 1.0f);
+	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Clipping Out and Falling in the 1 gap I made ends the game
+	createMapExit(-4.5f, -1.0f, 1.0f);
 
 
 
@@ -501,31 +577,31 @@ void coffeeAnimationTimer(int value)
 void CreatePlayer(bool show) {
 	glPushMatrix();
 	player.DrawPlayer(true);
-	bottomCheck.x = player.x + 0.2;
+	bottomCheck.x = player.x + 0.3;
 	bottomCheck.y = player.y;
-	bottomCheck.sizeX = 0.6;
+	bottomCheck.sizeX = 0.4;
 	bottomCheck.sizeY = 0.2;
 
 	bottomCheck.canSee = show;
 
-	leftCheck.x = player.x;
-	leftCheck.y = player.y + 0.2;
-	leftCheck.sizeX = 0.2;
-	leftCheck.sizeY = 0.6;
+	leftCheck.x = player.x + 0.25;
+	leftCheck.y = player.y + 0.3;
+	leftCheck.sizeX = 0.15;
+	leftCheck.sizeY = 0.4;
 
 	leftCheck.canSee = show;
 
-	rightCheck.x = player.x + 0.8;
-	rightCheck.y = player.y + 0.2;
-	rightCheck.sizeX = 0.2;
-	rightCheck.sizeY = 0.6;
+	rightCheck.x = player.x + 0.60;
+	rightCheck.y = player.y + 0.3;
+	rightCheck.sizeX = 0.15;
+	rightCheck.sizeY = 0.4;
 
 	rightCheck.canSee = show;
 
-	topCheck.x = player.x + 0.2;
-	topCheck.y = player.y + 0.8;
-	topCheck.sizeX = 0.6;
-	topCheck.sizeY = 0.2;
+	topCheck.x = player.x + 0.3;
+	topCheck.y = player.y + 0.75;
+	topCheck.sizeX = 0.4;
+	topCheck.sizeY = 0.15;
 
 	topCheck.canSee = show;
 
@@ -601,25 +677,25 @@ void MyDisplay() {
 	if (currentScene == MenuScene) {
 		glColor3f(1.0, 1.0, 1.0);
 		// Draw the large title text
-		glRasterPos2f(-5.0f, 2.0f); // Adjust as needed for centering
+		glRasterPos2f(-1.3f, -1.0f); // Adjust as needed for centering
 		const char* title = "Caffeine Crusader";
 		for (int i = 0; title[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, title[i]);
 		}
 		// Draw the smaller instruction text below the title
-		glRasterPos2f(-3.0f, 0.0f); // Adjust position as needed
+		glRasterPos2f(-0.75f, -1.6f); // Adjust position as needed
 		const char* menuMsg = "Press G to Start";
 		for (int i = 0; menuMsg[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuMsg[i]);
 		}
 		// Draw the smaller instruction text below the title
-		glRasterPos2f(-3.0f, -1.0f); // Adjust position as needed
+		glRasterPos2f(-0.75f, -1.4f); // Adjust position as needed
 		const char* menuDescripiton = "Collect all 10 Espresso Shots and return before the clock hits 0";
 		for (int i = 0; menuDescripiton[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuDescripiton[i]);
 		}
 		// Draw the smaller instruction text below the title
-		glRasterPos2f(-3.0f, -2.0f); // Adjust position as needed
+		glRasterPos2f(-0.75f, -1.2f); // Adjust position as needed
 		const char* menuComment = "Feed your addiction before you crash!";
 		for (int i = 0; menuComment[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuComment[i]);
@@ -649,13 +725,13 @@ void MyDisplay() {
 
 	else if (currentScene == LoseScene) {
 		glColor3f(1.0, 1.0, 1.0);
-		glRasterPos2f(player.x - 0.8f, player.y + 1);
+		glRasterPos2f(player.x - 0.5f, player.y + 1);
 		const char* message = "GAME OVER!";
 		for (int i = 0; message[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
-		glRasterPos2f(player.x - 0.8f, player.y - 1); // Adjust position as needed
-		const char* gameOverMsg = "Too eepy :(";
+		glRasterPos2f(player.x - 0.3f, player.y + 0.5); // Adjust position as needed
+		const char* gameOverMsg = "You were too eepy :(";
 		for (int i = 0; gameOverMsg[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, gameOverMsg[i]);
 		}
@@ -664,11 +740,16 @@ void MyDisplay() {
 	}
 
 	else if (currentScene == WinScene) {
-		glColor3f(0.0, 1.0, 0.0);
-		glRasterPos2f(player.x - 0.6f, player.y + 1);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glRasterPos2f(player.x - 0.5f, player.y + 1);
 		const char* message = "YOU WIN!";
 		for (int i = 0; message[i] != '\0'; i++) {
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
+		}
+		glRasterPos2f(player.x - 0.3f, player.y + 0.5);
+		const char* winMsg = "Wow! Awesome! B)";
+		for (int i = 0; winMsg[i] != '\0'; i++) {
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, winMsg[i]);
 		}
 		glutSwapBuffers();
 		return;
@@ -803,7 +884,7 @@ void Keyboard(unsigned char key, int x, int y) {
 			currentState = facingLeft ? JumpLeft : JumpRight;
 		}
 		break;
-	case 'e':
+	case 'g':
 		if (currentScene == MenuScene) {
 			currentScene = GameScene;
 			playGameMusic();
@@ -831,8 +912,8 @@ void Keyboard(unsigned char key, int x, int y) {
 
 void loadTextures() {
 	int i;
-	glGenTextures(49, texID); // Get the texture object IDs (Reserve IDs)
-	for (i = 0; i < 49; i++) {
+	glGenTextures(70, texID); // Get the texture object IDs (Reserve IDs)
+	for (i = 0; i < 70; i++) {
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
 		if (format == FIF_UNKNOWN) {
