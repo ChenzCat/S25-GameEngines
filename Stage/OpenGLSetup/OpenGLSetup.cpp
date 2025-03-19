@@ -660,6 +660,7 @@ void gravityCheck() {
 
 	if (player.y < -10.0) { // Out of bounds check
 		currentScene = LoseScene;
+		playLoseMusic();
 	}
 
 
