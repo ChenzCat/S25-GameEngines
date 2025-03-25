@@ -1,3 +1,7 @@
+// Computer Graphics  | Project 2: 2D Platformer
+// Vincenzo Cavallaro | Professor Meldin Bektic
+// Mar 20, 2025
+
 #include <GL/glut.h>
 #include <GL/freeglut.h>
 #include <FreeImage/FreeImage.h>
@@ -16,29 +20,41 @@ using namespace std;
 #define WIN_H 1080
 #define WIN_W 1920
 //-------------------------------------------------------------------------------------------------------------
-
 // Global Variables
+
+// Frame & Object Counter
 int displayFrame = 0, groundNum = 0, coffeeNum = 0;
+
+// Camera Positions
 float cameraX = 0.0f, cameraY = 0.0f;
-float cameraOffsetX = 0.0f, cameraOffsetY = 3.0f; // Offsets make cameras easier to understand. Might get reused for the game engine
+float offsetX = 0.0f, offsetY = 3.0f;
 
-float speed = 0.15f;				// Horizontal speed of the player
-float gravity = 0.2f;
+// Movement Values
+float speed = 0.15f;	// Horizontal
 
-float jumpTimer = 5, resetJumpTimer;
-float jumpAcceleration = 0.15f;		// Jump height
-float jumpVelocity = 0.8f;			// Initial upward jump velocity
+//float playerVel = 0.0f; // Horizontal velocity for momentum.
+//float playerFriction = 0.95f;  // Friction factor to slow the player gradually.
 
-// Collision
-bool showCollision = true;
+// Vertical
+float gravity = 0.2f;					// Doward Movement Speed
+float jumpTimer = 5, resetJumpTimer;	// Jump Reset
+float jumpAcceleration = 0.15f;			// Jump Height
+float jumpVelocity = 0.8f;				// Upward Movement Speed
+
+// Collision Flags
+bool showCollision = false;
 bool lt, rt, jump, contact, onGround;
 
-// Mechanics
-int totalcoffee = 10;
-int coffeeCollected = 0;
+// Toggles
+bool axis;
+
+// Mechanic Values
+int totalcoffee = 10;					// Collectibles (Total)
+int coffeeCollected = 0;				// Collectibles (Gathered)
 static int timeLeft = 60;
 
 // Game States
+// Resource: https://stackoverflow.com/questions/49966159/using-enum-for-gamestates-in-python | https://medium.com/@jordantkay/understanding-the-concept-of-an-enum-state-machine-b2aa4f49fc87
 enum Scenes
 {
 	MenuScene,
@@ -50,7 +66,7 @@ enum Scenes
 
 Scenes currentScene = MenuScene;
 
-// Player States
+// Player States for animation
 enum PlayerState
 {
 	IdleLeft,
@@ -61,24 +77,25 @@ enum PlayerState
 	JumpRight
 };
 
+// Player Animation
+PlayerState currentState = IdleRight;	// Start Looking Right
+int playerAnimFrame = 0;                // Cycle Frames
+bool facingLeft = false;                // Check Left Idle from Right Idle
 
-PlayerState currentState = IdleRight;  // Start facing right, idle
-int animFrameIndex = 0;                 // For cycling run frames
-bool facingLeft = false;                // Track last facing direction
 
-
-// coffee Animation
-int coffeeAnimFrame = 0;      // Animation frame index
-int coffeeAnimFrames = 4;     // Total coffee animation frames
-int coffeeAnimDelay = 200;    // Milliseconds per frame
+// Coffee Animation
+int coffeeAnimFrame = 0;      // Similar Index to Cyccle Frames
+int coffeeAnimDelay = 200;    // Frame Cycle Speed
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
-GLuint texID[70]; // Texture ID's for the four textures.
+// Texture IDs
+GLuint texID[70];
 
-char* textureFileNames[70] = {	// File names for the files from which texture images are loaded
-	// Knight
+char* textureFileNames[70] = 
+{
+	// Knight Textures
 	(char*)"sprite/KnightLeft1.png",
 	(char*)"sprite/KnightLeft2.png",
 	(char*)"sprite/KnightLeft3.png",
@@ -98,7 +115,7 @@ char* textureFileNames[70] = {	// File names for the files from which texture im
 	(char*)"sprite/KnightRight17.png",
 	(char*)"sprite/KnightRightStanding18.png",
 
-	// Coffee
+	// Coffee Textures
 	(char*)"sprite/Coffee19.png",
 	(char*)"sprite/Coffee20.png",
 	(char*)"sprite/Coffee21.png",
@@ -110,46 +127,58 @@ char* textureFileNames[70] = {	// File names for the files from which texture im
 	(char*)"sprite/TopInnerLeft24.png",
 	(char*)"sprite/TopInnerRight25.png",
 	(char*)"sprite/TopCornerRight26.png",
+
 	// Stone Middle
 	(char*)"sprite/MiddleSideLeft27.png",
 	(char*)"sprite/MiddleSideRight28.png",
+
 	// Stone Bottom
 	(char*)"sprite/BottomCornerLeft29.png",
 	(char*)"sprite/BottomInnerLeft30.png",
 	(char*)"sprite/BottomInnerRight31.png",
 	(char*)"sprite/BottomCornerRight32.png",
+
 	// Stone Segment Bottom
 	(char*)"sprite/BottomSegment(1)33.png",
 	(char*)"sprite/BottomSegment(2)34.png",
 	(char*)"sprite/BottomSegment(3)35.png",
+
 	// Stone Segment Top
 	(char*)"sprite/TopSegment(1)36.png",
 	(char*)"sprite/TopSegment(2)37.png",
 	(char*)"sprite/TopSegment(3)38.png",
+
 	// Wood
 	(char*)"sprite/MiddleWoodLeft(1)39.png",
 	(char*)"sprite/MiddleWood(2)40.png",
 	(char*)"sprite/MiddleWoodRight(3)41.png",
 	(char*)"sprite/TopWood42.png",
 	(char*)"sprite/BottomWood43.png",
+
 	// Wood Beam
 	(char*)"sprite/Beam(1)44.png",
 	(char*)"sprite/Beam(2)45.png",
 	(char*)"sprite/Beam(3)46.png",
 	(char*)"sprite/Beam(4)47.png",
 	(char*)"sprite/Beam(5)48.png",
+
 	// Void
 	(char*)"sprite/Void49.png",
+
 	// Props
-	(char*)"sprite/Door(1)50.png",
-	(char*)"sprite/Door(2)51.png",
+		// Door
+		(char*)"sprite/Door(1)50.png",
+		(char*)"sprite/Door(2)51.png",
 
-	(char*)"sprite/StonePlatform(1)52.png",
-	(char*)"sprite/StonePlatform(2)53.png",
-	(char*)"sprite/StonePlatform(3)54.png",
+		// Stone Platforms
+		(char*)"sprite/StonePlatform(1)52.png",
+		(char*)"sprite/StonePlatform(2)53.png",
+		(char*)"sprite/StonePlatform(3)54.png",
 
-	(char*)"sprite/Crate55.png",
+		// Create (Ended up using this the most)
+		(char*)"sprite/Crate55.png",
 
+	// Bonus
 	(char*)"sprite/Medo(1)56.png",
 	(char*)"sprite/Medo(2)57.png",
 	(char*)"sprite/Medo(3)58.png",
@@ -167,22 +196,23 @@ char* textureFileNames[70] = {	// File names for the files from which texture im
 	(char*)"sprite/Medo(15)70.png",
 };
 
+// Sound System: BGM
+//SoundEngine->play2D("audio/Game.mp3", true); Platform Example
 char* backgroundMusic[4] =
 {
-	// Sound System BGM
-	//SoundEngine->play2D("audio/Game.mp3", true);
 	(char*)"audio/Menu.mp3",
 	(char*)"audio/Game.mp3",
 	(char*)"audio/Lose.mp3",
 	(char*)"audio/Win.mp3"
 };
 
-char* sfxQueue[2] = 
+// Sound System: SFX
+char* sfxMusic[1] = 
 {
-	(char*)"audio/nes-sfx24.wav",
-	(char*)"audio/nes-sfx24.wav"
+	(char*)"audio/Jump.ogg"
 };
 
+//-------------------------------------------------------------------------------------------------------------
 // Gameobject class
 class GameObject
 {
@@ -207,14 +237,14 @@ public:
 	void DrawPlayer(bool sprite);
 };
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 
 // Global Objects
 
-// Player and Collision Boxes
+// Player and its Collision Boxes
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck;
 
-// Solid Blocks
+// Blocks (Platforms and Walls)
 GameObject CreateGround(float x, float y, float width, float height, bool collider = true, int texIndex = -1)
 {
 	GameObject ground;
@@ -228,17 +258,20 @@ GameObject CreateGround(float x, float y, float width, float height, bool collid
 	return ground;
 }
 
-// Platforms and Background Tiles
+// Total Platforms and Background Tiles Used
 GameObject ground[1000];
 
-// Collectable object Tiles
+// Total Collectibles Used
 GameObject collectible[10];
 
+// Total Hazards (Just one being a failsafe boundary)
 GameObject hazard;
 
+// Total Exits
 GameObject mapExit;
 
-GameObject createInvisibleCollider(float x, float y, float width, float height) 
+// Quick Invisible Collider
+GameObject createInvisibleCollider(float x, float y, float width, float height) // Plan to Refit this for future use
 {
 	GameObject collider;
 	collider.x = x;
@@ -247,7 +280,7 @@ GameObject createInvisibleCollider(float x, float y, float width, float height)
 	collider.sizeY = height;
 
 	collider.isSolid = true;
-	collider.canSee = true;
+	collider.canSee = false;
 	collider.colorR = 1.0f;
 	collider.colorG = 0.0f;
 	collider.colorB = 0.0f;
@@ -256,8 +289,9 @@ GameObject createInvisibleCollider(float x, float y, float width, float height)
 	return collider;
 }
 
-// GameObject Helper Functions
+//-------------------------------------------------------------------------------------------------------------
 
+// Coffee Collectible Helper
 void createcoffee(float x, float y)
 {
 	collectible[coffeeNum].x = x;
@@ -269,65 +303,54 @@ void createcoffee(float x, float y)
 	collectible[coffeeNum].canSee = true;
 	collectible[coffeeNum].destroyed = false;
 
-	collectible[coffeeNum].textureIndex = 18; // Example coffee texture index
+	collectible[coffeeNum].textureIndex = 18;
 
 	coffeeNum++;
 }
 
+// Block Column/Row Helper
 void createColumn(char direction, float startX, float startY, int length, int rows, float tileSize, bool collider = true, int startTexIndex = 8, int endTexIndex = -1, bool invisible = false)
 {
-	// If invisible is false, we create visible tiles.
-	// If invisible is true, we skip making visible tiles, but still make the collider if requested.
-
 	if (!invisible)
 	{
 		int totalTiles = length * rows;
 		int textureRange = (endTexIndex - startTexIndex) + 1;
-		if (textureRange < 1) textureRange = 1; // Safety fallback
+		if (textureRange < 1) textureRange = 1;
 
-		int tileCounter = 0; // Will increment as we place each tile
+		int tileCounter = 0; // Increments each tile
 
-		// Loop over rows (r) and columns (c)
+		// Loop over rows and columns
 		for (int r = 0; r < rows; r++)
 		{
 			for (int c = 0; c < length; c++)
 			{
 				float xPos, yPos;
 
-				// 'H' => horizontal
+				// 'H' creates horizontal placement
 				if (direction == 'H' || direction == 'h')
 				{
 					xPos = startX + c * tileSize;
 					yPos = startY + r * tileSize;
 				}
-				// 'V' => vertical
+				// Using V for organization alone
 				else
 				{
 					xPos = startX + r * tileSize;
 					yPos = startY + c * tileSize;
 				}
 
-				// Calculate which texture to use for this tile
+				// Tile Setup
 				int currentTexOffset = tileCounter % textureRange;
 				int currentTexIndex = startTexIndex + currentTexOffset;
-
-				// Create each tile with the current texture
-				ground[groundNum] = CreateGround(
-					xPos,
-					yPos,
-					tileSize,
-					tileSize,
-					false,    // Non-collidable by default
-					currentTexIndex
-				);
+				// Apple Set Tiles
+				ground[groundNum] = CreateGround( xPos, yPos, tileSize, tileSize, false, currentTexIndex);
 				groundNum++;
 				tileCounter++;
 			}
 		}
 	}
-	// If invisible == true, we skip creating visible tiles entirely
 
-	// Optionally create a single invisible collider for the entire block
+	// Large Collider Creation (Prevent Clipping)
 	if (collider)
 	{
 		float colliderWidth, colliderHeight;
@@ -337,7 +360,7 @@ void createColumn(char direction, float startX, float startY, int length, int ro
 			colliderWidth = length * tileSize;
 			colliderHeight = rows * tileSize;
 		}
-		else // 'V' or 'v'
+		else
 		{
 			colliderWidth = rows * tileSize;
 			colliderHeight = length * tileSize;
@@ -353,6 +376,7 @@ void createColumn(char direction, float startX, float startY, int length, int ro
 	}
 }
 
+// Hazard Object
 void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1.0f) 
 {
 	hazard.x = x;
@@ -364,13 +388,15 @@ void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1
 	hazard.destroyed = false;
 	hazard.textureIndex = -1;			
 
-	// Red Debug
+	// Debug Color (Red)
 	hazard.colorR = 1.0f;
 	hazard.colorG = 0.0f;
 	hazard.colorB = 0.0f;
 }
 
-void createMapExit(float x, float y, float tileSize = 1.0f, bool visible = false) {
+// Map Exit Function
+void createMapExit(float x, float y, float tileSize = 1.0f, bool visible = false) 
+{
 	mapExit.x = x;
 	mapExit.y = y;
 	mapExit.sizeX = tileSize;
@@ -379,34 +405,44 @@ void createMapExit(float x, float y, float tileSize = 1.0f, bool visible = false
 	mapExit.canSee = visible;
 	mapExit.destroyed = false;
 	mapExit.textureIndex = -1;
-	// Set debug color (green) if you choose to render it.
+
+	// Debug Color (Green)
 	mapExit.colorR = 0.0f;
 	mapExit.colorG = 1.0f;
 	mapExit.colorB = 0.0f;
 }
 
-// Sound Library
-void playMenuMusic() {
+// Sound Library Functions
+void playMenuMusic() 
+{
 	SoundEngine->stopAllSounds();
 	SoundEngine->play2D(backgroundMusic[0], true);
 }
 
-void playGameMusic() {
+void playGameMusic() 
+{
 	SoundEngine->stopAllSounds();
 	SoundEngine->play2D(backgroundMusic[1], true);
 }
 
-void playLoseMusic() {
+void playLoseMusic() 
+{
 	SoundEngine->stopAllSounds();
 	SoundEngine->play2D(backgroundMusic[2], false);
 }
 
-void playWinMusic() {
+void playWinMusic() 
+{
 	SoundEngine->stopAllSounds();
 	SoundEngine->play2D(backgroundMusic[3], false);
 }
 
-// Implementing Collision Detection (Used from the platform example)
+void playJumpSFX()
+{
+	SoundEngine->play2D(sfxMusic[0], false);
+}
+
+// Implementing Collision Detection | Source: Platform Example
 bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 {
 	// If either end up getting destroied, skip collisionGameObject
@@ -425,11 +461,12 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	return collisionX && collisionY;
 }
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Environment Initialization
 
-void init(void) {
-	// Clear The Window + Set Color
+void init(void) 
+{
+	// Clear The Window + Set Color (Match Tiles)
 	glClearColor((52.0f / 255.0f), (32.0f / 255.0f), (43.0f / 255.0f), 1.0f);
 
 
@@ -441,6 +478,7 @@ void init(void) {
 	// Prepare jump timer
 	resetJumpTimer = jumpTimer;
 
+	// Starting Position With Door
 	player.x = -4.5f;
 
 	playMenuMusic();
@@ -451,11 +489,9 @@ void init(void) {
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
 
-	// Floor
-
+	// Floors
 	createColumn('H', -5.5f, -2.0f, 8, 1, 1.0f, true, 36);
 	createColumn('H', 4.0f, -2.0f, 20, 1, 1.0f, true, 36);
-
 	createColumn('H', -5.5f, 6.0f, 30, 1, 1.0f, true, 33);
 
 	// Walls
@@ -467,13 +503,14 @@ void init(void) {
 	// Background
 	createColumn('V', -4.5f, -1.0f, 7, 30, 1.0f, false, 39);
 	createColumn('H', 34, 0.0f, 5, 5, 1.0f, false, 39);	// Secret Room
-		// Door
-		createColumn('V', -4.5f, -1.0f, 2, 1, 1.0f, false, 49, 50);
 
-	// Crates
-		createColumn('H', -1.5f, -1.0f, 2, 1, 1.0f, true, 54);
-		createColumn('V', 0.0f, 0.0f, 1, 2, 1.0f, true, 54);
-		createColumn('V', 0.5f, -1.0f, 1,2, 1.0f, true, 54);
+		// Door
+			createColumn('V', -4.5f, -1.0f, 2, 1, 1.0f, false, 49, 50);
+
+		// Crates
+			createColumn('H', -1.5f, -1.0f, 2, 1, 1.0f, true, 54);
+			createColumn('V', 0.0f, 0.0f, 1, 2, 1.0f, true, 54);
+			createColumn('V', 0.5f, -1.0f, 1,2, 1.0f, true, 54);
 
 		// Stairs
 			createColumn('V', 3.8f, -1.0f, 1, 1, 1.0f, true, 54);
@@ -519,13 +556,10 @@ void init(void) {
 			createColumn('H', 35, 0.0f, 4, 1, 1.0f, false, 63, 66);
 			createColumn('H', 35, -1.0f, 3, 1, 1.0f, false, 67, 69);
 
-
 	// Bounds
 	createColumn('H', -5.5f, -2.95f, 30, 1, 1.0f, false, 48);
 	createColumn('H', -5.5f, 6.95f, 30, 1, 1.0f, false, 48);
 	createColumn('V', -6.2f, -2.0f, 9, 1, 1.0f, false, 48);
-
-
 
 	// Collectable Setup
 	createcoffee(1.2f, 1.2f);  // 1
@@ -539,16 +573,9 @@ void init(void) {
 	createcoffee(16.2f, 1.5f); // 9
 	createcoffee(17.4f, 1.0f); // 10
 
-
-
-
-
 	// Win/Lose Objects
-	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Clipping Out and Falling in the 1 gap I made ends the game
+	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Falling Gameover Failsafe
 	createMapExit(-4.5f, -1.0f, 1.0f);
-
-
-
 }
 
 void CreateMechanics()
@@ -568,13 +595,14 @@ void CreateMechanics()
 
 void coffeeAnimationTimer(int value)
 {
-	coffeeAnimFrame = (coffeeAnimFrame + 1) % coffeeAnimFrames;
+	coffeeAnimFrame = (coffeeAnimFrame + 1) % 4;
 	glutPostRedisplay();  // Redraw the scene with the new coffee frame
 	glutTimerFunc(coffeeAnimDelay, coffeeAnimationTimer, 0);  // Schedule next frame update
 }
 
 // Draw Player Character + Colliders
-void CreatePlayer(bool show) {
+void CreatePlayer(bool show) 
+{
 	glPushMatrix();
 	player.DrawPlayer(true);
 	bottomCheck.x = player.x + 0.3;
@@ -612,40 +640,72 @@ void CreatePlayer(bool show) {
 	glPopMatrix();
 }
 
-// ========================================================================================================================================================================
+// Draw Axis
+void drawAxis()
+{
+	glPushMatrix();
+	glTranslatef(cameraX, cameraY - 2, 0.0f);
+
+	// X-axis (Red)
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glBegin(GL_LINES);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3f(1.0f, 0.0f, 0.0f);
+	glEnd();
+
+	// Y-axis (Green)
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glBegin(GL_LINES);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3f(0.0f, 1.0f, 0.0f);
+	glEnd();
+
+	glPopMatrix();
+}
+
+//-------------------------------------------------------------------------------------------------------------
 // Environment Logic
 
 // Physics
-void gravityCheck() {
+void gravityCheck() 
+{
 	onGround = false;
 
 	// If bottomCheck collides with any ground object: onGround=true
-	for (int i = 0; i < groundNum; ++i) {
-		if (ground[i].isSolid && CheckCollision(bottomCheck, ground[i])) {
+	for (int i = 0; i < groundNum; ++i) 
+	{
+		if (ground[i].isSolid && CheckCollision(bottomCheck, ground[i])) 
+		{
 			onGround = true;
 			break;
 		}
 	}
 
 	// If leftCheck collides: push the player right
-	for (int i = 0; i < groundNum; ++i) {
-		if (ground[i].isSolid && CheckCollision(leftCheck, ground[i])) {
+	for (int i = 0; i < groundNum; ++i) 
+	{
+		if (ground[i].isSolid && CheckCollision(leftCheck, ground[i])) 
+		{
 			player.x += speed;
 			break;
 		}
 	}
 
 	// If rightCheck collides: push the player left
-	for (int i = 0; i < groundNum; ++i) {
-		if (ground[i].isSolid && CheckCollision(rightCheck, ground[i])) {
+	for (int i = 0; i < groundNum; ++i) 
+	{
+		if (ground[i].isSolid && CheckCollision(rightCheck, ground[i])) 
+		{
 			player.x -= speed;
 			break;
 		}
 	}
 
 	// If topCheck collides (while jumping): Reset Jump Timer
-	for (int i = 0; i < groundNum; ++i) {
-		if (ground[i].isSolid && CheckCollision(topCheck, ground[i]) && jump) {
+	for (int i = 0; i < groundNum; ++i) 
+	{
+		if (ground[i].isSolid && CheckCollision(topCheck, ground[i]) && jump) 
+		{
 			jump = false;
 			jumpTimer = resetJumpTimer;
 			break;
@@ -653,12 +713,14 @@ void gravityCheck() {
 	}
 
 	// If not on ground: Apply Gravity
-	if (!onGround) {
+	if (!onGround) 
+	{
 		// Apply gravity
 		player.y -= gravity;
 	}
 
-	if (player.y < -10.0) { // Out of bounds check
+	if (player.y < -10.0) 
+	{ // Out of bounds. Used with out of bounds collider for future use. 
 		currentScene = LoseScene;
 		playLoseMusic();
 	}
@@ -667,89 +729,105 @@ void gravityCheck() {
 }
 
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Main Display
 
-void MyDisplay() {
+void MyDisplay() 
+{
 	glClear(GL_COLOR_BUFFER_BIT);
 	// Clear the screen
 
-
-	if (currentScene == MenuScene) {
+	if (currentScene == MenuScene) 
+	{
 		glColor3f(1.0, 1.0, 1.0);
-		// Draw the large title text
-		glRasterPos2f(-1.3f, -1.0f); // Adjust as needed for centering
+		
+		// Title
+		glRasterPos2f(-1.3f, -1.0f);
 		const char* title = "Caffeine Crusader";
-		for (int i = 0; title[i] != '\0'; i++) {
+		for (int i = 0; title[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, title[i]);
 		}
-		// Draw the smaller instruction text below the title
-		glRasterPos2f(-0.75f, -1.6f); // Adjust position as needed
+
+		// Instructions
+		glRasterPos2f(-0.75f, -1.6f);
 		const char* menuMsg = "Press G to Start";
-		for (int i = 0; menuMsg[i] != '\0'; i++) {
+		for (int i = 0; menuMsg[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuMsg[i]);
 		}
-		// Draw the smaller instruction text below the title
-		glRasterPos2f(-0.75f, -1.4f); // Adjust position as needed
+		glRasterPos2f(-0.75f, -1.4f); 
 		const char* menuDescripiton = "Collect all 10 Espresso Shots and return before the clock hits 0";
-		for (int i = 0; menuDescripiton[i] != '\0'; i++) {
+		for (int i = 0; menuDescripiton[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuDescripiton[i]);
 		}
-		// Draw the smaller instruction text below the title
-		glRasterPos2f(-0.75f, -1.2f); // Adjust position as needed
+		glRasterPos2f(-0.75f, -1.2f); 
 		const char* menuComment = "Feed your addiction before you crash!";
-		for (int i = 0; menuComment[i] != '\0'; i++) {
+		for (int i = 0; menuComment[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, menuComment[i]);
 		}
 		glutSwapBuffers();
 		return;
 	}
 
-	// Pause Scene: Display pause message and instruction.
-	else if (currentScene == PauseScene) {
+	// Pause Scene
+	else if (currentScene == PauseScene) 
+	{
 		glColor3f(1.0, 1.0, 1.0);
-		// Display large pause title
-		glRasterPos2f(player.x - 2.0f, player.y + 1.5f);
-		const char* pauseTitle = "GAME PAUSED";
-		for (int i = 0; pauseTitle[i] != '\0'; i++) {
+
+		glRasterPos2f(player.x - 0.8f, player.y + 1.5f);
+		const char* pauseTitle = "Game Paused";
+		for (int i = 0; pauseTitle[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pauseTitle[i]);
 		}
-		// Display smaller resume instruction below
-		glRasterPos2f(player.x - 1.8f, player.y + 1.0f);
-		const char* pauseMsg = "- Press P to Resume";
-		for (int i = 0; pauseMsg[i] != '\0'; i++) {
-			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pauseMsg[i]);
+
+		glRasterPos2f(player.x - 0.4f, player.y + 1.0f);
+		const char* pauseMsg = "Press P to Resume";
+		for (int i = 0; pauseMsg[i] != '\0'; i++) 
+		{
+			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, pauseMsg[i]);
 		}
 		glutSwapBuffers();
 		return;
 	}
 
-	else if (currentScene == LoseScene) {
+	// Lose Scene
+	else if (currentScene == LoseScene) 
+	{
 		glColor3f(1.0, 1.0, 1.0);
-		glRasterPos2f(player.x - 0.5f, player.y + 1);
-		const char* message = "GAME OVER!";
-		for (int i = 0; message[i] != '\0'; i++) {
+		glRasterPos2f(player.x - 0.8f, player.y + 1.5f);
+		const char* message = "Game Over";
+		for (int i = 0; message[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
-		glRasterPos2f(player.x - 0.3f, player.y + 0.5); // Adjust position as needed
+		glRasterPos2f(player.x - 0.6f, player.y + 1.0f);
 		const char* gameOverMsg = "You were too eepy :(";
-		for (int i = 0; gameOverMsg[i] != '\0'; i++) {
+		for (int i = 0; gameOverMsg[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, gameOverMsg[i]);
 		}
 		glutSwapBuffers();
 		return;
 	}
 
-	else if (currentScene == WinScene) {
+	// Win Scene
+	else if (currentScene == WinScene) 
+	{
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glRasterPos2f(player.x - 0.5f, player.y + 1);
 		const char* message = "YOU WIN!";
-		for (int i = 0; message[i] != '\0'; i++) {
+		for (int i = 0; message[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, message[i]);
 		}
 		glRasterPos2f(player.x - 0.3f, player.y + 0.5);
 		const char* winMsg = "Wow! Awesome! B)";
-		for (int i = 0; winMsg[i] != '\0'; i++) {
+		for (int i = 0; winMsg[i] != '\0'; i++) 
+		{
 			glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_10, winMsg[i]);
 		}
 		glutSwapBuffers();
@@ -757,29 +835,33 @@ void MyDisplay() {
 	}
 
 	// Object Spawn
-
-	for (int i = 0; i < groundNum; i++) {
-		if (!ground[i].isSolid) {
+	for (int i = 0; i < groundNum; i++) 
+	{
+		if (!ground[i].isSolid) 
+		{
 			ground[i].DrawGameObject(true);
 		}
 	}
 
 	// Update camera position
-	cameraX = player.x + player.sizeX / 2 + cameraOffsetX;
-	cameraY = player.y + player.sizeY / 2 + cameraOffsetY;
+	cameraX = player.x + player.sizeX / 2 + offsetX;
+	cameraY = player.y + player.sizeY / 2 + offsetY;
 	if (player.y == -3.0f)
 	{
 		cameraY = -3.0f;
 	}
 
-	// Set view matrix to follow the player
+	// View Matrix
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	gluLookAt(cameraX, cameraY, 5,		// Camera position (x, y, z)
-		cameraX, cameraY, 0,			// Looking at (player)
-		0, 1, 0);						// Up vector (y-axis)
+	gluLookAt(cameraX, cameraY, 5, cameraX, cameraY, 0, 0, 1, 0);
 
-	// Draws the player (with or without collision visualized)
+	if (axis)
+	{
+		drawAxis();
+	}
+
+	// Draws the player
 	CreatePlayer(showCollision);
 
 	for (int i = 0; i < coffeeNum; i++)
@@ -799,12 +881,14 @@ void MyDisplay() {
 	hazard.DrawGameObject(false);
 	mapExit.DrawGameObject(false);
 
-	if (CheckCollision(player, hazard)) {
+	if (CheckCollision(player, hazard)) 
+	{
 		currentScene = LoseScene;
 		playLoseMusic();
 	}
 
-	if (CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee) {
+	if (CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee) 
+	{
 		currentScene = WinScene;
 		playWinMusic();
 	}
@@ -821,20 +905,18 @@ void MyDisplay() {
 	if (rt)
 		player.x += speed;
 
-
-
-
-
 	glFlush();
 	glutSwapBuffers();
 }
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Controls
 
-void specialKeyboard(int key, int x, int y) {
+void specialKeyboard(int key, int x, int y) 
+{
 
-	switch (key) {
+	switch (key) 
+	{
 	case GLUT_KEY_LEFT:
 		lt = true;
 		rt = false;
@@ -853,86 +935,105 @@ void specialKeyboard(int key, int x, int y) {
 	glutPostRedisplay();
 }
 
-void specialKeyboardRelease(int key, int x, int y) {
-
-	switch (key) {
+void specialKeyboardRelease(int key, int x, int y) 
+{
+	switch (key) 
+	{
 	case GLUT_KEY_LEFT:
 		lt = false;
 		if (currentState == RunLeft) 
 		{
 			currentState = IdleLeft;
-			animFrameIndex = 0; // reset run frames
+			playerAnimFrame = 0;
 		}
 		break;
 	case GLUT_KEY_RIGHT:
 		rt = false;
-		if (currentState == RunRight) {
+		if (currentState == RunRight) 
+		{
 			currentState = IdleRight;
-			animFrameIndex = 0;
+			playerAnimFrame = 0;
 		}
 		break;
 	}
 }
 
-void Keyboard(unsigned char key, int x, int y) {
-	switch (key) {
+void Keyboard(unsigned char key, int x, int y) 
+{
+	switch (key) 
+	{
+	case 'a': // Axis Toggle 
+		axis = !axis;
+		break;
+
 	case 's':
 		showCollision = !showCollision;
 		break;
-	case 32: // Spacebar for jump (only in GameScene)
-		if (currentScene == GameScene && onGround && !jump) {
+	case 32: // Spacebar: Jump while in game
+		if (currentScene == GameScene && onGround && !jump) 
+		{
 			jump = true;
 			currentState = facingLeft ? JumpLeft : JumpRight;
+			playJumpSFX();
 		}
 		break;
 	case 'g':
-		if (currentScene == MenuScene) {
+		if (currentScene == MenuScene) 
+		{
 			currentScene = GameScene;
 			playGameMusic();
 		}
 		break;
-	case 'p': // Toggle Pause
-		if (currentScene == GameScene) {
+	case 'p': // Toggle Pause while in game 
+		if (currentScene == GameScene) 
+		{
 			currentScene = PauseScene;
 			SoundEngine->setAllSoundsPaused(true);
 		}
-		else if (currentScene == PauseScene) {
+		else if (currentScene == PauseScene) 
+		{
 			currentScene = GameScene;
 			SoundEngine->setAllSoundsPaused(false);
 		}
 		break;
-	case 27: // Escape key
+	case 27: // Escape
 		exit(0);
 	}
 	glutPostRedisplay();
 }
 
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Loading Textures
 
-void loadTextures() {
+void loadTextures() 
+{
 	int i;
 	glGenTextures(70, texID); // Get the texture object IDs (Reserve IDs)
-	for (i = 0; i < 70; i++) {
+	for (i = 0; i < 70; i++) 
+	{
 		// Load image with FreeImage
 		FREE_IMAGE_FORMAT format = FreeImage_GetFIFFromFilename(textureFileNames[i]);
-		if (format == FIF_UNKNOWN) {
+		if (format == FIF_UNKNOWN) 
+		{
 			printf("Unknown file type for texture image file %s\n", textureFileNames[i]);
 			continue;
 		}
 		FIBITMAP* bitmap = FreeImage_Load(format, textureFileNames[i], PNG_DEFAULT); // Load PNG files
-		if (!bitmap) {
+		if (!bitmap) 
+		{
 			printf("Failed to load image %s\n", textureFileNames[i]);
 			continue;
 		}
 		FIBITMAP* bitmap32 = FreeImage_ConvertTo32Bits(bitmap); // Convert to 32-bit (with alpha channel)
 		FreeImage_Unload(bitmap);
-		if (bitmap32) {
+		if (bitmap32) 
+		{
 			BYTE* bits = FreeImage_GetBits(bitmap32);
 			int width = FreeImage_GetWidth(bitmap32);
 			int height = FreeImage_GetHeight(bitmap32);
-			for (int j = 0; j < width * height; j++) {
+			for (int j = 0; j < width * height; j++) 
+			{
 				BYTE temp = bits[j * 4];
 				bits[j * 4] = bits[j * 4 + 2];
 				bits[j * 4 + 2] = temp;
@@ -949,30 +1050,35 @@ void loadTextures() {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set blending function
 }
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 
 
-void updateAnimationFrame() {
-	// If the player is jumping, use a special frame or frames
-	if (jump) {
-		// If you want separate left/right jump frames:
-		if (facingLeft) {
+void updateAnimationFrame() 
+{
+	// Jumping Frame
+	if (jump) 
+	{
+		// Left Facing Jump
+		if (facingLeft) 
+		{
 			// example: pick frame 14 for jump-left
-			displayFrame = 14;
+			displayFrame = 2;
 		}
-		else {
-			// example: pick frame 15 for jump-right
+		else 
+		{
+		// Otherwise Face Right
 			displayFrame = 15;
 		}
 		return;
 	}
 
 	// Otherwise, pick frames based on currentState:
-	switch (currentState) {
+	switch (currentState) 
+	{
 	case RunLeft:
 		// frames [0..7] for running left
-		// animFrameIndex cycles 0..7
-		displayFrame = animFrameIndex;
+		// playerAnimFrame cycles 0..7
+		displayFrame = playerAnimFrame;
 		break;
 
 	case IdleLeft:
@@ -982,7 +1088,7 @@ void updateAnimationFrame() {
 
 	case RunRight:
 		// frames [9..16] for running right
-		displayFrame = 9 + animFrameIndex;
+		displayFrame = 9 + playerAnimFrame;
 		break;
 
 	case IdleRight:
@@ -997,46 +1103,56 @@ void updateAnimationFrame() {
 	}
 }
 
-void cycleRunFrames() {
-	// If RunLeft, cycle 0..7
-	if (currentState == RunLeft) {
-		animFrameIndex++;
-		if (animFrameIndex > 7) animFrameIndex = 0;
+void cycleRunFrames() 
+{
+	// Running Left
+	if (currentState == RunLeft) 
+	{
+		playerAnimFrame++;
+		if (playerAnimFrame > 7) playerAnimFrame = 0;
 	}
-	// If RunRight, cycle 0..7 (added offset in updateAnimationFrame)
-	else if (currentState == RunRight) {
-		animFrameIndex++;
-		if (animFrameIndex > 7) animFrameIndex = 0;
+	// Running Right
+	else if (currentState == RunRight) 
+	{
+		playerAnimFrame++;
+		if (playerAnimFrame > 7) playerAnimFrame = 0;
 	}
-	// Idle states don't cycle
-	// Jump states we override frame anyway
-}
+	// Idle states don't cycle. Although it would have been fun to add.
+}	// Honestly, I have found such a strong love for this. Hopefully, I am good at coding it. 
 
 // Global Timer
-void timer(int v) {
+void timer(int v) 
+{
 	// Only update the game timer when in GameScene.
-	if (currentScene == MenuScene || currentScene == PauseScene || currentScene == LoseScene || currentScene == WinScene) {
+	if (currentScene == MenuScene || currentScene == PauseScene || currentScene == LoseScene || currentScene == WinScene) 
+	{
 		glutTimerFunc(100, timer, 0);
 		return;
 	}
 
 	static int gameTimerAccumulator = 0;
 	gameTimerAccumulator += 100;
-	if (gameTimerAccumulator >= 1000) {
+	if (gameTimerAccumulator >= 1000) 
+	{
 		timeLeft--;
 		gameTimerAccumulator = 0;
-		if (timeLeft <= 0) {
+		if (timeLeft <= 0) 
+		{
 			currentScene = LoseScene;
 			playLoseMusic();
 		}
 	}
-	if (jump) {
-		if (jumpTimer > 0) {
-			if (lt) {
+	if (jump) 
+	{
+		if (jumpTimer > 0) 
+		{
+			if (lt) 
+			{
 				currentState = JumpLeft;
 				facingLeft = true;
 			}
-			else if (rt) {
+			else if (rt) 
+			{
 				currentState = JumpRight;
 				facingLeft = false;
 			}
@@ -1044,7 +1160,8 @@ void timer(int v) {
 			jumpVelocity -= jumpAcceleration;
 			jumpTimer--;
 		}
-		else {
+		else 
+		{
 			jump = false;
 			jumpTimer = resetJumpTimer;
 			jumpVelocity = 0.8f;
@@ -1057,15 +1174,16 @@ void timer(int v) {
 	glutTimerFunc(100, timer, 0);
 }
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Main
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) 
+{
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGB); // RGB mode
-    glutInitWindowSize(WIN_W, WIN_H); // window size
+    glutInitDisplayMode(GLUT_RGB);			// RGB mode
+    glutInitWindowSize(WIN_W, WIN_H);		// window size
     glutInitWindowPosition(WIN_X, WIN_Y);
-    glutCreateWindow("Platform Example");
+    glutCreateWindow("V Cavallaro | 811097945");
 
     // Start the coffee animation timer
     glutTimerFunc(coffeeAnimDelay, coffeeAnimationTimer, 0);
@@ -1074,19 +1192,38 @@ int main(int argc, char** argv) {
     init();
     loadTextures();
     
-    glutDisplayFunc(MyDisplay); // Drawing function
+    glutDisplayFunc(MyDisplay);				// Drawing function
     glutKeyboardFunc(Keyboard);
     glutSpecialFunc(specialKeyboard);
     glutSpecialUpFunc(specialKeyboardRelease);
-    
+
+	// Print controls to terminal
+	std::cout << std::endl;
+	std::cout << "Controls:\n";
+	std::cout << "Arrow Keys: Move the player\n";
+	std::cout << "Space Bar: Jump\n";
+	std::cout << "'a': Toggle axis\n";
+	std::cout << "'g': Start Game\n";
+	std::cout << "'p': Pause Game\n";
+	std::cout << "'s': Debug Collider Boxs\n";
+	std::cout << "ESC: Exit\n\n";
+
+	std::cout << "Bonus Features:\n";
+	std::cout << "Movement State Conditions\n\n";
+	
+	std::cout << "Credits:\n";
+	std::cout << "The Legend of Zelda: Majora's Mask\n";
+	std::cout << "Bakudas: Generic Dungeon Pack\n";
+	std::cout << "Wulax:  Medieval fantasy character sprites\n";
     glutMainLoop();
     return 0;
 }
 
-// ========================================================================================================================================================================
+//-------------------------------------------------------------------------------------------------------------
 // Game Object Implementation
 
-GameObject::GameObject() {
+GameObject::GameObject() 
+{
 	x = y = z = 0;
 	sizeX = sizeY = 1;
 	colorR = colorG = colorB = 1;
@@ -1111,10 +1248,12 @@ void GameObject::DrawGameObject(bool sprite)
 
 			glEnable(GL_TEXTURE_2D); // Enable texturing
 
-			if (textureIndex == 18) { // If it's a coffee
+			if (textureIndex == 18) 
+			{ // Coffee Sprite Condiiton
 				glBindTexture(GL_TEXTURE_2D, texID[18 + coffeeAnimFrame]);
 			}
-			else {
+			else 
+			{
 				glBindTexture(GL_TEXTURE_2D, texID[textureIndex]);
 			}
 
