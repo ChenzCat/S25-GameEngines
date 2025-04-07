@@ -7,6 +7,7 @@
 #include <array>
 #include <list>
 #include <iostream>
+#include <sstream>
 #include <functional>
 #include <IrrKlang/irrKlang.h>
 using namespace irrklang;
@@ -28,13 +29,11 @@ float jumpTimer = 10, resetJumpTimer;
 float jumpAcceleration = 1.0f; // Adjust this value for jump height
 float jumpVelocity = 0.5f; // Adjust this value for initial jump velocity
 
+float cameraX = 0, cameraY = 0;
+
 bool showCollision = true;
 
 bool lt, rt, jump, contact, onGround;
-
-bool dropDown; // Toggle the drop down menu
-bool fileDropDown, helpDropDown;
-bool buttonClicked = false; // Check if drop down button was clicked so button behind doesn't click
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
@@ -81,6 +80,85 @@ public:
 
 // Gameobjects on the screen
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
+
+class TextInput {
+public:
+	float x, y; // Position of the text input box in the viewport
+	float width, height; // Dimensions of the text input box in the viewport
+	float windowX, windowY; // Position of the button in the window
+	float windowWidth, windowHeight; // Dimensions of the button in the window
+	string text; // Text to be displayed in the text input box
+	GameObject* gameObject; // Used to get and set the variables of the game object
+	bool active; // Indicates whether the text input box is active (selected for input)
+
+	TextInput(float posX, float posY, float w, float h,
+		float winX, float winY, float winW, float winH,
+		const string& txt)
+		: x(posX), y(posY), width(w), height(h),
+		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
+		text(txt), active(false), gameObject(nullptr) {}
+
+	void setActive(bool isActive) {
+		active = isActive;
+	}
+
+	// Convert text to float
+	float textToFloat() {
+		float result;
+		stringstream ss(text);
+		ss >> result;
+		return result;
+	}
+
+	void handleKeyPress(unsigned char key) {
+		if (active) {
+			if (key == '\b' && !text.empty()) { // Backspace key
+				text.pop_back();
+			}
+			else if ((key >= '0' && key <= '9') || key == '.' || key == '-') {
+				text += key;
+			}
+			if (gameObject != nullptr)
+				// Update the x value whenever a valid character is entered
+				gameObject->x = textToFloat();
+		}
+	}
+
+	bool isInside(int mouseX, int mouseY) {
+		// Calculate the boundaries of the button
+		float leftBoundary = windowX - windowWidth / 2;
+		float rightBoundary = windowX + windowWidth / 2;
+		float bottomBoundary = windowY - windowHeight / 2;
+		float topBoundary = windowY + windowHeight / 2;
+
+		// Check if mouseX falls within the button's x-boundaries
+		bool insideX = (mouseX >= leftBoundary && mouseX <= rightBoundary);
+
+		// Check if mouseY falls within the button's y-boundaries
+		bool insideY = (mouseY >= bottomBoundary && mouseY <= topBoundary);
+
+		// Return true only if both mouseX and mouseY fall within the button's boundaries
+		return insideX && insideY;
+	}
+
+	void draw() {
+		// Draw the text input box background
+		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the text input box
+		glBegin(GL_QUADS);
+		glVertex2f(x, y);
+		glVertex2f(x + width, y);
+		glVertex2f(x + width, y + height);
+		glVertex2f(x, y + height);
+		glEnd();
+
+		// Draw the text inside the text input box
+		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
+		glRasterPos2f(x + 0.05f, y + (height / 2) - 0.05f); // Adjust position for centering
+		for (char c : text) {
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
+		}
+	}
+};
 
 // Button class
 class Button {
@@ -157,9 +235,8 @@ public:
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
 list<Button> leftPanelButtons;
 
-list<Button> topPanelButtons;
-
-list<Button> fileDropDownButtons, helpDropDownButtons;
+// Text input variable
+TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
@@ -183,37 +260,17 @@ void buttonAction2() {
 	printf("Completed action 2 \n");
 }
 
-void fileButtonAction() {
+void buttonAction3() {
 	// Define actions for buttons
-	dropDown = true;
-	fileDropDown = true;
-	helpDropDown = false;
-	printf("Completed file button action \n");
-}
-
-void helpButtonAction() {
-	// Define actions for buttons
-	dropDown = true;
-	fileDropDown = false;
-	helpDropDown = true;
-	printf("Completed help button action \n");
+	showCollision = !showCollision;
+	printf("Completed action 3 \n");
 }
 
 void buttonAction4() {
 	// Define actions for buttons
-	dropDown = false;
-	fileDropDown = false;
-	helpDropDown = false;
-	exit(0);
-	printf("Completed exiting action \n");
-}
-
-void buttonAction5() {
-	// Define actions for buttons
-	dropDown = false;
-	fileDropDown = false;
-	helpDropDown = false;
-	printf("Completed action 5 \n");
+	textInput.text = to_string(ground[0].x);
+	textInput.gameObject = &ground[0];
+	printf("Completed action 4 \n");
 }
 
 void init(void) {
@@ -264,20 +321,11 @@ void init(void) {
 	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
 	leftPanelButtons.push_back(button2);
 
-	Button button3(-6.5, 0, 1, 20, 33, 25, 66, 50, fileButtonAction, "    File");
-	topPanelButtons.push_back(button3);
+	Button button3(0, button2.y - 0.7, 14, 0.5, 100, button2.windowY + 30, 200, 20, buttonAction3, "Show Player Collider");
+	leftPanelButtons.push_back(button3);
 
-	Button button4(-5.5, 0, 1, 20, 107, 25, 66, 50, helpButtonAction, "    Help");
-	topPanelButtons.push_back(button4);
-
-	Button fileButton(-5.6, 5.95, 2, 0.5, 100, 64, 142, 26, buttonAction4, "             Exit");
-	fileDropDownButtons.push_back(fileButton);
-
-	Button helpButton1(-4.6, 5.95, 2, 0.5, 173, 64, 142, 26, buttonAction5, "           About");
-	helpDropDownButtons.push_back(helpButton1);
-
-	Button helpButton2(-4.6, helpButton1.y - 0.5, 2, 0.5, helpButton1.windowX, helpButton1.windowY+ 30, 142, 26, buttonAction5, "           Controls");
-	helpDropDownButtons.push_back(helpButton2);
+	Button button4(0, button3.y - 0.7, 14, 0.5, 100, button3.windowY + 30, 200, 20, buttonAction4, "Ground 1");
+	leftPanelButtons.push_back(button4);
 }
 
 void CreatePlayer(bool show) {
@@ -428,6 +476,7 @@ void drawLeftPanel() {
 	// Dark Grey background
 	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
 
+	// Draw text box to label panel
 	drawTextWithBG("                 Hierarchy",
 		0, 6.6, 14, 0.8, true);
 
@@ -443,6 +492,15 @@ void drawMainPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W, BOTTOM_PANEL_H, MAIN_PANEL_W, MIDDLE_PANEL_H);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+
+	// Make sure to set up the camera after the viewport but within the push and pop
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	// Set up the camera position and orientation
+	gluLookAt(cameraX, cameraY, 0.1, // Camera position
+		cameraX, cameraY, 0.0f,    // Look-at point (looking at the center of the scene)
+		0.0f, 1.0f, 0.0f);          // Up vector
 
 	// Makes the player
 	CreatePlayer(showCollision);
@@ -475,10 +533,19 @@ void drawRightPanel() {
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
 
 	// Green background
-	drawSquare(15, 14, 1, 0, 0, 0, 0, 1, 0);
+	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
 
-	// Makes the player
-	//CreatePlayer(showCollision);
+	// Draw text box to label panel
+	drawTextWithBG("                 Inscpector",
+		0, 6.6, 14, 0.8, true);
+
+	// Draw text box for x coordinate label
+	drawTextWithBG("X:",
+		-4, 5.6, 6, 0.5, true);
+
+	// Draw the text box
+	textInput.draw();
+
 	glPopMatrix();
 }
 
@@ -489,12 +556,8 @@ void drawTopPanel() {
 	//glScalef(1, 20, 1);
 
 	// Blue background 
-	drawSquare(20, 20, 1, 0, 0, 0, 0.5, 0.5, 0.5);
+	drawSquare(20, 20, 1, 0, 0, 0, 0.0, 0.0, 1.0);
 
-	// Draw the buttons
-	for (auto& button : topPanelButtons) {
-		button.draw();
-	}
 
 	glPopMatrix();
 }
@@ -503,34 +566,13 @@ void drawBottomPanel() {
 	glPushMatrix();
 	glViewport(0, 0, WIN_W, BOTTOM_PANEL_H);
 
-	//glScalef(1, 5, 1);
+	glScalef(1, 5, 1);
 
 	// Blue background
-	drawSquare(14, 15, 1, 0, 0, 0, 1, 0, 0);
+	drawSquare(14, 3, 1, 0, 0, 0, 1, 0, 0);
 
-	glPopMatrix();
-}
-
-// Draws a viewport over the entire window that we can draw our menu on
-void drawDropDownViewport() {
-	glPushMatrix();
-	glViewport(0, 0, WIN_W, WIN_H);
-
-	if (dropDown)
-	{
-		// Draw the buttons for file drop down menu
-		if (fileDropDown)
-			for (auto& button : fileDropDownButtons) {
-				button.draw();
-			}
-
-		// Draw the buttons for help drop down menu
-		if (helpDropDown)
-			for (auto& button : helpDropDownButtons) {
-				button.draw();
-			}
-	}
-
+	// Makes the player
+	//CreatePlayer(showCollision);
 	glPopMatrix();
 }
 
@@ -544,7 +586,6 @@ void MyDisplay() {
 	drawRightPanel();
 	drawTopPanel();
 	drawBottomPanel();
-	drawDropDownViewport();
 
 	glutSwapBuffers();
 }
@@ -579,10 +620,22 @@ void specialKeyboardRelease(int key, int x, int y) {
 
 void Keyboard(unsigned char key, int x, int y)
 {
+	// Handle key press events for input boxes
+	textInput.handleKeyPress(key);
+
 	switch (key)
 	{
-	case 's': // Show ground check
-		showCollision = !showCollision;
+	case 's': // Move camera up
+		cameraY -= 0.1f; // Adjust the value to control speed
+		break;
+	case 'a': // Move camera left
+		cameraX -= 0.1f;
+		break;
+	case 'w': // Move camera down
+		cameraY += 0.1f;
+		break;
+	case 'd': // Move camera right
+		cameraX += 0.1f;
 		break;
 	case 32: // Spacebar
 		if (onGround && !jump) {
@@ -599,6 +652,8 @@ void Keyboard(unsigned char key, int x, int y)
 
 void MouseControl(int button, int state, int x, int y) {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		// Initialize world coordinates and clicked panel
+		float worldX, worldY;
 		string clickedPanel;
 
 		// Determine which viewport was clicked
@@ -630,61 +685,29 @@ void MouseControl(int button, int state, int x, int y) {
 
 		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 
-		// Checks if drop down menu is up
-		if (dropDown)
-		{
-			buttonClicked = false;
-
-			// Check if any button was clicked
-			for (auto& button : fileDropDownButtons) {
-				if (button.isInside(x, y) && fileDropDown) {
-					buttonClicked = true;
-					button.handleClick(); // Trigger the action associated with the button
-					break; // Exit the loop after handling the click for one button
-				}
-			}
-
-			for (auto& button : helpDropDownButtons) {
-				if (button.isInside(x, y) && helpDropDown) {
-					buttonClicked = true;
-					button.handleClick(); // Trigger the action associated with the button
-					break; // Exit the loop after handling the click for one button
-				}
-			}
-
-			// If no button was clicked, then enables other editor buttons
-			if (!buttonClicked) {
-				dropDown = false;
-				fileDropDown = false;
-				helpDropDown = false;
+		// Check if any button was clicked
+		for (auto& button : leftPanelButtons) {
+			if (button.isInside(x, y)) {
+				button.handleClick(); // Trigger the action associated with the button
+				break; // Exit the loop after handling the click for one button
 			}
 		}
-
-		// Doesn't allow other buttons to be clicked if drop down is up.
-		if (!dropDown && !buttonClicked)
-		{
-			// Check if any button was clicked
-			for (auto& button : leftPanelButtons) {
-				if (button.isInside(x, y)) {
-					button.handleClick(); // Trigger the action associated with the button
-					break; // Exit the loop after handling the click for one button
-				}
-			}
-
-			// Check if any button was clicked
-			for (auto& button : topPanelButtons) {
-				if (button.isInside(x, y)) {
-					button.handleClick(); // Trigger the action associated with the button
-					break; // Exit the loop after handling the click for one button
-				}
-			}
-		}
-
-		// Allows for none drop down buttons to be clickable again
-		if (buttonClicked)
-			buttonClicked = false;
 	}
+
+	// Check if clicked in or out of text box to set as active or not.
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		if (textInput.isInside(x, y)) {
+			textInput.setActive(true);
+		}
+
+		else {
+			textInput.setActive(false);
+		}
+	}
+
+	glutPostRedisplay();
 }
+
 
 void loadTextures() {
 	int i;
@@ -757,7 +780,7 @@ int main(int argc, char** argv) {
 
 	// Initialize window and create it
 	glutInitWindowSize(WIN_W, WIN_H);
-	glutCreateWindow("Button Drop Down Menu Example");
+	glutCreateWindow("Text Box Entry Example");
 
 	glutTimerFunc(0, timer, 0);
 
@@ -765,7 +788,7 @@ int main(int argc, char** argv) {
 
 	loadTextures();
 
-	glutDisplayFunc(MyDisplay); // Call the drawing function
+	glutDisplayFunc(MyDisplay); // call the drawing function
 
 	glutKeyboardFunc(Keyboard);
 	glutSpecialFunc(specialKeyboard);
