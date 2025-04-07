@@ -32,6 +32,10 @@ bool showCollision = true;
 
 bool lt, rt, jump, contact, onGround;
 
+bool dropDown; // Toggle the drop down menu
+bool fileDropDown, helpDropDown;
+bool buttonClicked = false; // Check if drop down button was clicked so button behind doesn't click
+
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 
@@ -89,10 +93,10 @@ public:
 	bool clicked; // Indicates whether the button has been clicked
 	function<void()> buttonAction; // Action handler for the button
 
-	Button(float posX, float posY, float w, float h, 
+	Button(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
 		function<void()> act, const string& txt)
-		: x(posX), y(posY), width(w), height(h), 
+		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
 		text(txt), buttonAction(act), clicked(false) {}
 
@@ -150,15 +154,18 @@ public:
 	}
 };
 
-
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
 list<Button> leftPanelButtons;
+
+list<Button> topPanelButtons;
+
+list<Button> fileDropDownButtons, helpDropDownButtons;
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
 void buttonAction1() {
 	// Define actions for buttons
-	for(int i = 0; i < 3; ++i){
+	for (int i = 0; i < 3; ++i) {
 		ground[i].colorR = 0;
 		ground[i].colorG = 1;
 		ground[i].colorB = 0;
@@ -176,10 +183,37 @@ void buttonAction2() {
 	printf("Completed action 2 \n");
 }
 
-void buttonAction3() {
+void fileButtonAction() {
 	// Define actions for buttons
-	showCollision = !showCollision;
-	printf("Completed action 3 \n");
+	dropDown = true;
+	fileDropDown = true;
+	helpDropDown = false;
+	printf("Completed file button action \n");
+}
+
+void helpButtonAction() {
+	// Define actions for buttons
+	dropDown = true;
+	fileDropDown = false;
+	helpDropDown = true;
+	printf("Completed help button action \n");
+}
+
+void buttonAction4() {
+	// Define actions for buttons
+	dropDown = false;
+	fileDropDown = false;
+	helpDropDown = false;
+	exit(0);
+	printf("Completed exiting action \n");
+}
+
+void buttonAction5() {
+	// Define actions for buttons
+	dropDown = false;
+	fileDropDown = false;
+	helpDropDown = false;
+	printf("Completed action 5 \n");
 }
 
 void init(void) {
@@ -220,18 +254,30 @@ void init(void) {
 	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
 
 	// Create buttons and add them to the list
-    Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green");
+	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green");
 	// Add buttons to list
 	leftPanelButtons.push_back(button1);
 
 	// Top left corner is (0, 0), so if you want to make a list of 
 	// buttons that you can just add, you'll need to add to the 
 	// windowY rather than subtract to go down the window.
-    Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
+	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
 	leftPanelButtons.push_back(button2);
 
-	Button button3(0, button2.y - 0.7, 14, 0.5, 100, button2.windowY + 30, 200, 20, buttonAction3, "Show Player Collider");
-	leftPanelButtons.push_back(button3);
+	Button button3(-6.5, 0, 1, 20, 33, 25, 66, 50, fileButtonAction, "    File");
+	topPanelButtons.push_back(button3);
+
+	Button button4(-5.5, 0, 1, 20, 107, 25, 66, 50, helpButtonAction, "    Help");
+	topPanelButtons.push_back(button4);
+
+	Button fileButton(-5.6, 5.95, 2, 0.5, 100, 64, 142, 26, buttonAction4, "             Exit");
+	fileDropDownButtons.push_back(fileButton);
+
+	Button helpButton1(-4.6, 5.95, 2, 0.5, 173, 64, 142, 26, buttonAction5, "           About");
+	helpDropDownButtons.push_back(helpButton1);
+
+	Button helpButton2(-4.6, helpButton1.y - 0.5, 2, 0.5, helpButton1.windowX, helpButton1.windowY+ 30, 142, 26, buttonAction5, "           Controls");
+	helpDropDownButtons.push_back(helpButton2);
 }
 
 void CreatePlayer(bool show) {
@@ -351,7 +397,7 @@ void drawTextWithBG(string text, float x, float y, float width, float height, bo
 	// Draw the text background using the calculated center position
 	if (showBG) { // Turn background on or off
 		glColor3f(0.75f, 0.75f, 0.75f); // Light gray color for the background
-												  // You can add more to change the color
+		// You can add more to change the color
 		glBegin(GL_QUADS);
 		glVertex3f(centerX, centerY, 0);
 		glVertex3f(centerX + width, centerY, 0);
@@ -443,8 +489,12 @@ void drawTopPanel() {
 	//glScalef(1, 20, 1);
 
 	// Blue background 
-	drawSquare(20, 20, 1, 0, 0, 0, 0.0, 0.0, 1.0);
+	drawSquare(20, 20, 1, 0, 0, 0, 0.5, 0.5, 0.5);
 
+	// Draw the buttons
+	for (auto& button : topPanelButtons) {
+		button.draw();
+	}
 
 	glPopMatrix();
 }
@@ -453,13 +503,34 @@ void drawBottomPanel() {
 	glPushMatrix();
 	glViewport(0, 0, WIN_W, BOTTOM_PANEL_H);
 
-	glScalef(1, 5, 1);
+	//glScalef(1, 5, 1);
 
 	// Blue background
-	drawSquare(14, 3, 1, 0, 0, 0, 1, 0, 0);
+	drawSquare(14, 15, 1, 0, 0, 0, 1, 0, 0);
 
-	// Makes the player
-	//CreatePlayer(showCollision);
+	glPopMatrix();
+}
+
+// Draws a viewport over the entire window that we can draw our menu on
+void drawDropDownViewport() {
+	glPushMatrix();
+	glViewport(0, 0, WIN_W, WIN_H);
+
+	if (dropDown)
+	{
+		// Draw the buttons for file drop down menu
+		if (fileDropDown)
+			for (auto& button : fileDropDownButtons) {
+				button.draw();
+			}
+
+		// Draw the buttons for help drop down menu
+		if (helpDropDown)
+			for (auto& button : helpDropDownButtons) {
+				button.draw();
+			}
+	}
+
 	glPopMatrix();
 }
 
@@ -473,6 +544,7 @@ void MyDisplay() {
 	drawRightPanel();
 	drawTopPanel();
 	drawBottomPanel();
+	drawDropDownViewport();
 
 	glutSwapBuffers();
 }
@@ -526,10 +598,8 @@ void Keyboard(unsigned char key, int x, int y)
 }
 
 void MouseControl(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        // Initialize world coordinates and clicked panel
-        float worldX, worldY;
-        string clickedPanel;
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		string clickedPanel;
 
 		// Determine which viewport was clicked
 		if (x >= 0 && x < SIDE_PANEL_W) {
@@ -537,39 +607,84 @@ void MouseControl(int button, int state, int x, int y) {
 			clickedPanel = "Left Panel";
 		}
 		else if (x >= SIDE_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W) {
-            // Main panel clicked
-            clickedPanel = "Main Panel";
-        }
+			// Main panel clicked
+			clickedPanel = "Main Panel";
+		}
 		else if (x >= SIDE_PANEL_W + MAIN_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W * 2) {
-            // Right panel clicked
-            clickedPanel = "Right Panel";
-        }
+			// Right panel clicked
+			clickedPanel = "Right Panel";
+		}
 		else {
-            // Main panel clicked
-            clickedPanel = "Main Panel";
-        }
+			// Main panel clicked
+			clickedPanel = "Main Panel";
+		}
 
-        if (y >= WIN_H - BOTTOM_PANEL_H) {
-            // Bottom panel clicked
-            clickedPanel = "Bottom Panel";
-        }
+		if (y >= WIN_H - BOTTOM_PANEL_H) {
+			// Bottom panel clicked
+			clickedPanel = "Bottom Panel";
+		}
 		else if (y < TOP_PANEL_H) {
-            // Top panel clicked
-            clickedPanel = "Top Panel";
-        }
+			// Top panel clicked
+			clickedPanel = "Top Panel";
+		}
 
-        cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
+		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 
-        // Check if any button was clicked
-        for (auto& button : leftPanelButtons) {
-            if (button.isInside(x, y)) {
-                button.handleClick(); // Trigger the action associated with the button
-                break; // Exit the loop after handling the click for one button
-            }
-        }
-    }
+		// Checks if drop down menu is up
+		if (dropDown)
+		{
+			buttonClicked = false;
+
+			// Check if any button was clicked
+			for (auto& button : fileDropDownButtons) {
+				if (button.isInside(x, y) && fileDropDown) {
+					buttonClicked = true;
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
+			}
+
+			for (auto& button : helpDropDownButtons) {
+				if (button.isInside(x, y) && helpDropDown) {
+					buttonClicked = true;
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
+			}
+
+			// If no button was clicked, then enables other editor buttons
+			if (!buttonClicked) {
+				dropDown = false;
+				fileDropDown = false;
+				helpDropDown = false;
+			}
+		}
+
+		// Doesn't allow other buttons to be clicked if drop down is up.
+		if (!dropDown && !buttonClicked)
+		{
+			// Check if any button was clicked
+			for (auto& button : leftPanelButtons) {
+				if (button.isInside(x, y)) {
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
+			}
+
+			// Check if any button was clicked
+			for (auto& button : topPanelButtons) {
+				if (button.isInside(x, y)) {
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
+			}
+		}
+
+		// Allows for none drop down buttons to be clickable again
+		if (buttonClicked)
+			buttonClicked = false;
+	}
 }
-
 
 void loadTextures() {
 	int i;
@@ -642,7 +757,7 @@ int main(int argc, char** argv) {
 
 	// Initialize window and create it
 	glutInitWindowSize(WIN_W, WIN_H);
-	glutCreateWindow("Button Example");
+	glutCreateWindow("Button Drop Down Menu Example");
 
 	glutTimerFunc(0, timer, 0);
 
@@ -650,7 +765,7 @@ int main(int argc, char** argv) {
 
 	loadTextures();
 
-	glutDisplayFunc(MyDisplay); // call the drawing function
+	glutDisplayFunc(MyDisplay); // Call the drawing function
 
 	glutKeyboardFunc(Keyboard);
 	glutSpecialFunc(specialKeyboard);
