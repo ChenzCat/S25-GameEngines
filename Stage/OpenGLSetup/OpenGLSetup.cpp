@@ -31,8 +31,6 @@ float jumpVelocity = 0.5f; // Adjust this value for initial jump velocity
 
 bool showCollision = true;
 
-bool gravityOn = false; // Toggle the gravity. I'm just doing it like this for the example but you should do it per object (Hint: maybe in the class)
-
 bool lt, rt, jump, contact, onGround;
 
 // Creates sound engine
@@ -72,106 +70,14 @@ public:
 	bool      destroyed;
 	bool      gravity;
 
+	GameObject();
 
-	// Default constructor
-	GameObject()
-		: x(0), y(0), z(0),
-		sizeX(1), sizeY(1),
-		colorR(1), colorG(1), colorB(1),
-		mass(0), canSee(true), isSolid(false),
-		destroyed(false), gravity(false) {}
-
-	void DrawGameObject(bool sprite) {
-		glPushMatrix();
-		glTranslatef(x, y, z);
-
-		if (canSee && !destroyed)
-		{
-			if (sprite)
-			{
-				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-
-				glEnable(GL_TEXTURE_2D); // Enable texturing
-
-				glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
-
-				glBegin(GL_POLYGON);
-				glTexCoord2f(0.0, 0.0);
-				glVertex3f(-0.5, -0.5, 0);
-				glTexCoord2f(1.0, 0.0);
-				glVertex3f(0.5 + sizeX - 1, -0.5, 0);
-				glTexCoord2f(1.0, 1.0);
-				glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
-				glTexCoord2f(0.0, 1.0);
-				glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
-				glEnd();
-
-				glDisable(GL_TEXTURE_2D); // Turn texturing off
-			}
-			else
-			{
-				glColor3f(colorR, colorG, colorB);
-
-				glBegin(GL_POLYGON);
-				glVertex3f(-0.5, -0.5, 0);
-				glVertex3f(0.5 + sizeX - 1, -0.5, 0);
-				glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
-				glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
-				glEnd();
-			}
-		}
-		glPopMatrix();
-	}
-
-	void DrawPlayer(bool sprite) {
-		glPushMatrix();
-		glTranslatef(x, y, z);
-
-		if (canSee && !destroyed)
-		{
-			//Draw Player
-			if (sprite)
-			{
-				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-
-				glEnable(GL_TEXTURE_2D); // Enable texturing
-
-				glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
-
-				glBegin(GL_POLYGON);
-				glTexCoord2f(0.0, 0.0);
-				glVertex3f(-0.5, -0.5, 0);
-				glTexCoord2f(1.0, 0.0);
-				glVertex3f(0.5 + sizeX - 1, -0.5, 0);
-				glTexCoord2f(1.0, 1.0);
-				glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
-				glTexCoord2f(0.0, 1.0);
-				glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
-				glEnd();
-
-				glDisable(GL_TEXTURE_2D); // Turn texturing off
-			}
-			else
-			{
-				glColor3f(colorR, colorG, colorB);
-
-				glBegin(GL_POLYGON);
-				glVertex3f(-0.5, -0.5, 0);
-				glVertex3f(0.5 + sizeX - 1, -0.5, 0);
-				glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
-				glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
-				glEnd();
-			}
-		}
-
-		glPopMatrix();
-	}
+	void DrawGameObject(bool);
+	void DrawPlayer(bool);
 };
 
 // Gameobjects on the screen
-GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, collectible;
-
-list<GameObject> platforms;
+GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
 
 class TextInput {
 public:
@@ -184,7 +90,7 @@ public:
 	bool active; // Indicates whether the text input box is active (selected for input)
 
 	TextInput(float posX, float posY, float w, float h,
-		float winX, float winY, float winW, float winH,
+		float winX, float winY, float winW, float winH, 
 		const string& txt)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
@@ -207,10 +113,10 @@ public:
 			if (key == '\b' && !text.empty()) { // Backspace key
 				text.pop_back();
 			}
-			else if ((key >= '0' && key <= '9') || key == '.' || key == '-') {
+			else if ((key >= '0' && key <= '9') || key == '.') {
 				text += key;
 			}
-			if (gameObject != nullptr)
+			if(gameObject != nullptr)
 				// Update the x value whenever a valid character is entered
 				gameObject->x = textToFloat();
 		}
@@ -261,20 +167,14 @@ public:
 	float windowWidth, windowHeight; // Dimensions of the button in the window
 	string text; // Text to be displayed on the button
 	bool clicked; // Indicates whether the button has been clicked
-	function<void(Button&)> buttonAction; // Action handler for the button
-										  // Had to update here to allow for button passing
-	GameObject* gameObject; // Used to get and set the variables of the game object
-	int textureNum; // Texture number
-	bool sprite; // If there is a sprite or not
+	function<void()> buttonAction; // Action handler for the button
 
-	// x, y, w, h, windowX, windowY, windowWidth, windowHeight, text, buttonAction, gameObject pointer
-	// Updated to allow for the passing of a gameObject reference but is not necessary
 	Button(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
-		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
+		function<void()> act, const string& txt)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false) {}
+		text(txt), buttonAction(act), clicked(false) {}
 
 	bool isInside(int mouseX, int mouseY) {
 		// Calculate the boundaries of the button
@@ -296,7 +196,7 @@ public:
 	// Method to handle button click
 	void handleClick() {
 		if (buttonAction) {
-			buttonAction(*this); // Invoke the action handler and passes the button now
+			buttonAction(); // Invoke the action handler
 		}
 	}
 
@@ -328,115 +228,47 @@ public:
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
 		}
 	}
-
-	void drawAssetButton(){
-		// Calculate the position to center the button
-		float centerX = x - width / 2;
-		float centerY = y - height / 2;
-
-		// Draw the button background using the calculated center position
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
-		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
-		glEnd();
-
-		float widthAdjust = centerX + width / 10;
-		float heightAdjust = centerY + height / 3;
-
-		if (sprite) {
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-
-			glEnable(GL_TEXTURE_2D); // Enable texturing
-
-			glBindTexture(GL_TEXTURE_2D, texID[textureNum]); // Which texture
-
-			glBegin(GL_POLYGON);
-			glTexCoord2f(0.0, 0.0);
-			glVertex3f(widthAdjust, heightAdjust, 0);
-			glTexCoord2f(1.0, 0.0);
-			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust, 0);
-			glTexCoord2f(1.0, 1.0);
-			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust + (height / 2), 0);
-			glTexCoord2f(0.0, 1.0);
-			glVertex3f(widthAdjust, heightAdjust + (height / 2), 0);
-			glEnd();
-
-			glDisable(GL_TEXTURE_2D); // Turn texturing off
-		}
-
-		else {
-			glColor3f(1, 0, 1); // Purple color for the sprite in the button
-			glBegin(GL_QUADS);
-			glVertex3f(widthAdjust, heightAdjust, 0);
-			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust, 0);
-			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust + (height / 2), 0);
-			glVertex3f(widthAdjust, heightAdjust + (height / 2), 0);
-			glEnd();
-		}
-
-		// Adjust horizontal position to center the text horizontally within the button
-		float textX = centerX + 0.1;
-
-		// Adjust vertical position to center the text vertically within the button
-		float textY = centerY + (height / 10);
-
-		// Draw the button text
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos3f(textX, textY, 1);
-		for (int i = 0; i < text.length(); i++) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
-		}
-	}
-
-	// Static method to create and add a new button to a specified list
-	static void addToList(list<Button>& buttonList, float x, float y, float w, float h,
-		float winX, float winY, float winW, float winH,
-		function<void(Button&)> action, const string& text, GameObject* obj) {
-
-		// Create a new button instance and add it to the list
-		buttonList.emplace_back(x, y, w, h, winX, winY, winW, winH, action, text, obj);
-	}
 };
 
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
-list<Button> leftPanelButtons, bottomPanelButtons;
+list<Button> leftPanelButtons;
 
 // Text input variable
-TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
+TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 33, 7, "");
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
-void hierarchyButton(Button& button) {
-	if (button.gameObject != nullptr) {
-		// Update textInput with gameObject's x-coordinate
-		textInput.text = to_string(button.gameObject->x);
-		textInput.gameObject = button.gameObject;
+void buttonAction1() {
+	// Define actions for buttons
+	for (int i = 0; i < 3; ++i) {
+		ground[i].colorR = 0;
+		ground[i].colorG = 1;
+		ground[i].colorB = 0;
 	}
-	else {
-		cout << "Button's gameObject is null" << endl;
-	}
-
-	cout << "Completed button action" << endl;
+	printf("Completed action 1 \n");
 }
 
-// Adds a ground asset to the game
-void buttonAddGround(Button& button) {
+void buttonAction2() {
 	// Define actions for buttons
-	GameObject ground;
-	ground.colorG = 0;
-	platforms.emplace_back(ground);
+	for (int i = 0; i < 3; ++i) {
+		ground[i].colorR = 1;
+		ground[i].colorG = 0;
+		ground[i].colorB = 1;
+	}
+	printf("Completed action 2 \n");
+}
 
-	// Top left corner is (0, 0), so if you want to make a list of 
-	// buttons that you can just add, you'll need to add to the 
-	// windowY rather than subtract to go down the window.
-	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5, 
-		100, leftPanelButtons.back().windowY + 30, 200, 20, 
-		hierarchyButton, "Ground " + to_string(leftPanelButtons.size()), &platforms.back());
+void buttonAction3() {
+	// Define actions for buttons
+	showCollision = !showCollision;
+	printf("Completed action 3 \n");
+}
 
-	printf("Completed action add ground \n");
+void buttonAction4() {
+	// Define actions for buttons
+	textInput.text = to_string(ground[0].x);
+	textInput.gameObject = &ground[0];
+	printf("Completed action 4 \n");
 }
 
 void init(void) {
@@ -448,12 +280,25 @@ void init(void) {
 
 	resetJumpTimer = jumpTimer;
 
-	player.y = 1;
-
 	bottomCheck.colorR = 0;
 	leftCheck.colorR = 0;
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
+
+	ground[0].x = -3.5;
+	ground[0].y = -3;
+	ground[0].sizeX = 7;
+	ground[0].colorG = 0;
+
+	ground[1].x = 3.5;
+	ground[1].y = -3;
+	ground[1].sizeX = 3;
+	ground[1].colorG = 0;
+
+	ground[2].x = -5.5;
+	ground[2].y = -1;
+	ground[2].sizeX = 3;
+	ground[2].colorG = 0;
 
 	collectible.x = -4;
 	collectible.y = 2;
@@ -464,14 +309,21 @@ void init(void) {
 	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
 
 	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
+	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green");
 	// Add buttons to list
 	leftPanelButtons.push_back(button1);
 
+	// Top left corner is (0, 0), so if you want to make a list of 
+	// buttons that you can just add, you'll need to add to the 
+	// windowY rather than subtract to go down the window.
+	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
+	leftPanelButtons.push_back(button2);
 
-	// Bottom buttons
-	Button bottomButton(-6, -1, 1, 8, 70, 763, 70, 114, buttonAddGround, "  Ground");
-	bottomPanelButtons.push_back(bottomButton);
+	Button button3(0, button2.y - 0.7, 14, 0.5, 100, button2.windowY + 30, 200, 20, buttonAction3, "Show Player Collider");
+	leftPanelButtons.push_back(button3);
+
+	Button button4(0, button3.y - 0.7, 14, 0.5, 100, button3.windowY + 30, 200, 20, buttonAction4, "Ground 1");
+	leftPanelButtons.push_back(button4);
 }
 
 void CreatePlayer(bool show) {
@@ -528,33 +380,32 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	return collisionX && collisionY;
 }
 
-// Updated to match the new list for all the ground platforms
 void gravityCheck() {
 	onGround = false;
 
-	for (auto& ground : platforms) {
-		if (CheckCollision(bottomCheck, ground)) {
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(bottomCheck, ground[i])) {
 			onGround = true;
 			break;
 		}
 	}
 
-	for (auto& ground : platforms) {
-		if (CheckCollision(leftCheck, ground)) {
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(leftCheck, ground[i])) {
 			player.x += speed;
 			break;
 		}
 	}
 
-	for (auto& ground : platforms) {
-		if (CheckCollision(rightCheck, ground)) {
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(rightCheck, ground[i])) {
 			player.x -= speed;
 			break;
 		}
 	}
 
-	for (auto& ground : platforms) {
-		if (CheckCollision(topCheck, ground) && jump) {
+	for (int i = 0; i <= groundNum; ++i) {
+		if (CheckCollision(topCheck, ground[i]) && jump) {
 			jump = false;
 			jumpTimer = resetJumpTimer;
 			break;
@@ -643,10 +494,10 @@ void drawMainPanel() {
 	// Makes the player
 	CreatePlayer(showCollision);
 
-	// Make the ground
-	for (auto& ground : platforms) {
-		ground.DrawGameObject(false);
-	}
+	// Makes the ground
+	ground[0].DrawGameObject(false);
+	ground[1].DrawGameObject(false);
+	ground[2].DrawGameObject(false);
 
 	// Makes the collectible
 	collectible.DrawGameObject(false);
@@ -655,8 +506,7 @@ void drawMainPanel() {
 	if (CheckCollision(player, collectible))
 		collectible.destroyed = true;
 
-	if(gravityOn)
-		gravityCheck();
+	gravityCheck();
 
 	//Movement
 	if (lt)
@@ -705,19 +555,13 @@ void drawBottomPanel() {
 	glPushMatrix();
 	glViewport(0, 0, WIN_W, BOTTOM_PANEL_H);
 
-	//glScalef(1, 5, 1);
+	glScalef(1, 5, 1);
 
-	// Dark Grey background
-	drawSquare(14, 15, 1, 0, 0, 0, 0.5, 0.5, 0.5);
+	// Blue background
+	drawSquare(14, 3, 1, 0, 0, 0, 1, 0, 0);
 
-	drawTextWithBG("                  Assets",
-	0, 5.7, 14, 2.6, true);
-
-	// Draw the buttons
-	for (auto& button : bottomPanelButtons) {
-		button.drawAssetButton();
-	}
-
+	// Makes the player
+	//CreatePlayer(showCollision);
 	glPopMatrix();
 }
 
@@ -766,15 +610,12 @@ void specialKeyboardRelease(int key, int x, int y) {
 void Keyboard(unsigned char key, int x, int y)
 {
 	// Handle key press events for input boxes
-	textInput.handleKeyPress(key);
+	textInput.handleKeyPress(key); 
 
 	switch (key)
 	{
 	case 's': // Show ground check
 		showCollision = !showCollision;
-		break;
-	case 'g': // Toggle gravity
-		gravityOn = !gravityOn;
 		break;
 	case 32: // Spacebar
 		if (onGround && !jump) {
@@ -826,13 +667,6 @@ void MouseControl(int button, int state, int x, int y) {
 
 		// Check if any button was clicked
 		for (auto& button : leftPanelButtons) {
-			if (button.isInside(x, y)) {
-				button.handleClick(); // Trigger the action associated with the button
-				break; // Exit the loop after handling the click for one button
-			}
-		}
-
-		for (auto& button : bottomPanelButtons) {
 			if (button.isInside(x, y)) {
 				button.handleClick(); // Trigger the action associated with the button
 				break; // Exit the loop after handling the click for one button
@@ -926,7 +760,7 @@ int main(int argc, char** argv) {
 
 	// Initialize window and create it
 	glutInitWindowSize(WIN_W, WIN_H);
-	glutCreateWindow("Dynamic Button List Example");
+	glutCreateWindow("Text Box Entry Example");
 
 	glutTimerFunc(0, timer, 0);
 
@@ -943,4 +777,103 @@ int main(int argc, char** argv) {
 
 	glutMainLoop();
 	return 0;
+}
+
+GameObject::GameObject() {
+	x = y = z = 0;
+	sizeX = sizeY = 1;
+	colorR = colorG = colorB = 1;
+	mass = 0;
+	canSee = true;
+	isSolid = false;
+	destroyed = false;
+	gravity = false;
+}
+
+void GameObject::DrawGameObject(bool sprite)
+{
+	glPushMatrix();
+	glTranslatef(x, y, z);
+
+	if (canSee && !destroyed)
+	{
+		if (sprite)
+		{
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(-0.5, -0.5, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+		else
+		{
+			glColor3f(colorR, colorG, colorB);
+
+			glBegin(GL_POLYGON);
+			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+		}
+	}
+	glPopMatrix();
+}
+
+void GameObject::DrawPlayer(bool sprite)
+{
+	glPushMatrix();
+	glTranslatef(x, y, z);
+
+	if (canSee && !destroyed)
+	{
+		//Draw Player
+		if (sprite)
+		{
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(-0.5, -0.5, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+		else
+		{
+			glColor3f(colorR, colorG, colorB);
+
+			glBegin(GL_POLYGON);
+			glVertex3f(-0.5, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, -0.5, 0);
+			glVertex3f(0.5 + sizeX - 1, 0.5 + sizeY - 1, 0);
+			glVertex3f(-0.5, 0.5 + sizeY - 1, 0);
+			glEnd();
+		}
+	}
+
+	glPopMatrix();
 }
