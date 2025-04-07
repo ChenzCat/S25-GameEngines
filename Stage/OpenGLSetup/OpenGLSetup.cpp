@@ -5,17 +5,13 @@
 #include <stdio.h>
 #include <math.h>
 #include <array>
-#include <list>
 #include <iostream>
-#include <sstream>
-#include <functional>
 #include <IrrKlang/irrKlang.h>
 using namespace irrklang;
 using namespace std;
 
 #define MAIN_PANEL_W 600 // Width of the main panel
 #define SIDE_PANEL_W 200 // Width of each side panel
-#define MIDDLE_PANEL_H 600 // Height of middle panels
 #define BOTTOM_PANEL_H 200 // Height of the bottom panel
 #define TOP_PANEL_H 50 // Height of top panel
 #define WIN_W 1000 // Adjusted window width
@@ -28,8 +24,6 @@ float speed = 0.15, gravity = 0.2;
 float jumpTimer = 10, resetJumpTimer;
 float jumpAcceleration = 1.0f; // Adjust this value for jump height
 float jumpVelocity = 0.5f; // Adjust this value for initial jump velocity
-
-float cameraX = 0, cameraY = 0;
 
 bool showCollision = true;
 
@@ -81,196 +75,37 @@ public:
 // Gameobjects on the screen
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
 
-class TextInput {
-public:
-	float x, y; // Position of the text input box in the viewport
-	float width, height; // Dimensions of the text input box in the viewport
-	float windowX, windowY; // Position of the button in the window
-	float windowWidth, windowHeight; // Dimensions of the button in the window
-	string text; // Text to be displayed in the text input box
-	GameObject* gameObject; // Used to get and set the variables of the game object
-	bool active; // Indicates whether the text input box is active (selected for input)
+bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
+{
+	if (one.destroyed || two.destroyed)
+		return false;
 
-	TextInput(float posX, float posY, float w, float h,
-		float winX, float winY, float winW, float winH,
-		const string& txt)
-		: x(posX), y(posY), width(w), height(h),
-		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), active(false), gameObject(nullptr) {}
+	// collision x-axis?
+	bool collisionX = one.x + one.sizeX >= two.x && two.x + two.sizeX >= one.x;
 
-	void setActive(bool isActive) {
-		active = isActive;
-	}
+	// collision y-axis?
+	bool collisionY = one.y + one.sizeY >= two.y && two.y + two.sizeY >= one.y;
 
-	// Convert text to float
-	float textToFloat() {
-		float result;
-		stringstream ss(text);
-		ss >> result;
-		return result;
-	}
 
-	void handleKeyPress(unsigned char key) {
-		if (active) {
-			if (key == '\b' && !text.empty()) { // Backspace key
-				text.pop_back();
-			}
-			else if ((key >= '0' && key <= '9') || key == '.' || key == '-') {
-				text += key;
-			}
-			if (gameObject != nullptr)
-				// Update the x value whenever a valid character is entered
-				gameObject->x = textToFloat();
-		}
-	}
-
-	bool isInside(int mouseX, int mouseY) {
-		// Calculate the boundaries of the button
-		float leftBoundary = windowX - windowWidth / 2;
-		float rightBoundary = windowX + windowWidth / 2;
-		float bottomBoundary = windowY - windowHeight / 2;
-		float topBoundary = windowY + windowHeight / 2;
-
-		// Check if mouseX falls within the button's x-boundaries
-		bool insideX = (mouseX >= leftBoundary && mouseX <= rightBoundary);
-
-		// Check if mouseY falls within the button's y-boundaries
-		bool insideY = (mouseY >= bottomBoundary && mouseY <= topBoundary);
-
-		// Return true only if both mouseX and mouseY fall within the button's boundaries
-		return insideX && insideY;
-	}
-
-	void draw() {
-		// Draw the text input box background
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the text input box
-		glBegin(GL_QUADS);
-		glVertex2f(x, y);
-		glVertex2f(x + width, y);
-		glVertex2f(x + width, y + height);
-		glVertex2f(x, y + height);
-		glEnd();
-
-		// Draw the text inside the text input box
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos2f(x + 0.05f, y + (height / 2) - 0.05f); // Adjust position for centering
-		for (char c : text) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
-		}
-	}
-};
-
-// Button class
-class Button {
-public:
-	float x, y; // Position of the button in the viewport
-	float width, height; // Dimensions of the button in the viewport
-	float windowX, windowY; // Position of the button in the window
-	float windowWidth, windowHeight; // Dimensions of the button in the window
-	string text; // Text to be displayed on the button
-	bool clicked; // Indicates whether the button has been clicked
-	function<void()> buttonAction; // Action handler for the button
-
-	Button(float posX, float posY, float w, float h,
-		float winX, float winY, float winW, float winH,
-		function<void()> act, const string& txt)
-		: x(posX), y(posY), width(w), height(h),
-		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false) {}
-
-	bool isInside(int mouseX, int mouseY) {
-		// Calculate the boundaries of the button
-		float leftBoundary = windowX - windowWidth / 2;
-		float rightBoundary = windowX + windowWidth / 2;
-		float bottomBoundary = windowY - windowHeight / 2;
-		float topBoundary = windowY + windowHeight / 2;
-
-		// Check if mouseX falls within the button's x-boundaries
-		bool insideX = (mouseX >= leftBoundary && mouseX <= rightBoundary);
-
-		// Check if mouseY falls within the button's y-boundaries
-		bool insideY = (mouseY >= bottomBoundary && mouseY <= topBoundary);
-
-		// Return true only if both mouseX and mouseY fall within the button's boundaries
-		return insideX && insideY;
-	}
-
-	// Method to handle button click
-	void handleClick() {
-		if (buttonAction) {
-			buttonAction(); // Invoke the action handler
-		}
-	}
-
-	// Method to draw the button
-	void draw() {
-		// Calculate the position to center the button
-		float centerX = x - width / 2;
-		float centerY = y - height / 2;
-
-		// Draw the button background using the calculated center position
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
-		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
-		glEnd();
-
-		// Adjust horizontal position to center the text horizontally within the button
-		float textX = centerX + 0.1;
-
-		// Adjust vertical position to center the text vertically within the button
-		float textY = centerY + (height - 0.2) / 2;
-
-		// Draw the button text
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos3f(textX, textY, 1);
-		for (int i = 0; i < text.length(); i++) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
-		}
-	}
-};
-
-// List of buttons (Hint: You could make multiple lists for the different panels buttons)
-list<Button> leftPanelButtons;
-
-// Text input variable
-TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
-
-// Give buttons functions by making functions and 
-// assiging them when the button is made.
-void buttonAction1() {
-	// Define actions for buttons
-	for (int i = 0; i < 3; ++i) {
-		ground[i].colorR = 0;
-		ground[i].colorG = 1;
-		ground[i].colorB = 0;
-	}
-	printf("Completed action 1 \n");
+	// collision only if on both axes
+	return collisionX && collisionY;
 }
 
-void buttonAction2() {
-	// Define actions for buttons
-	for (int i = 0; i < 3; ++i) {
-		ground[i].colorR = 1;
-		ground[i].colorG = 0;
-		ground[i].colorB = 1;
-	}
-	printf("Completed action 2 \n");
-}
+// Draws a square and you can determine the size, position, and color.
+void drawSquare(float sizeX, float sizeY, float sizeZ, float x, float y, float z, float r, float g, float b) {
+	glPushMatrix();
 
-void buttonAction3() {
-	// Define actions for buttons
-	showCollision = !showCollision;
-	printf("Completed action 3 \n");
-}
+	glScalef(sizeX, sizeY, sizeZ);
+	glTranslatef(x, y, z);
+	glColor3f(r, g, b); // Light gray background
+	glBegin(GL_POLYGON);
+	glVertex3f(-0.5, -0.5, 0);
+	glVertex3f(0.5, -0.5, 0);
+	glVertex3f(0.5, 0.5, 0);
+	glVertex3f(-0.5, 0.5, 0);
+	glEnd();
 
-void buttonAction4() {
-	// Define actions for buttons
-	textInput.text = to_string(ground[0].x);
-	textInput.gameObject = &ground[0];
-	printf("Completed action 4 \n");
+	glPopMatrix();
 }
 
 void init(void) {
@@ -309,23 +144,6 @@ void init(void) {
 	collectible.colorB = 0;
 
 	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
-
-	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green");
-	// Add buttons to list
-	leftPanelButtons.push_back(button1);
-
-	// Top left corner is (0, 0), so if you want to make a list of 
-	// buttons that you can just add, you'll need to add to the 
-	// windowY rather than subtract to go down the window.
-	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
-	leftPanelButtons.push_back(button2);
-
-	Button button3(0, button2.y - 0.7, 14, 0.5, 100, button2.windowY + 30, 200, 20, buttonAction3, "Show Player Collider");
-	leftPanelButtons.push_back(button3);
-
-	Button button4(0, button3.y - 0.7, 14, 0.5, 100, button3.windowY + 30, 200, 20, buttonAction4, "Ground 1");
-	leftPanelButtons.push_back(button4);
 }
 
 void CreatePlayer(bool show) {
@@ -367,21 +185,6 @@ void CreatePlayer(bool show) {
 	glPopMatrix();
 }
 
-bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
-{
-	if (one.destroyed || two.destroyed)
-		return false;
-
-	// collision x-axis?
-	bool collisionX = one.x + one.sizeX >= two.x && two.x + two.sizeX >= one.x;
-
-	// collision y-axis?
-	bool collisionY = one.y + one.sizeY >= two.y && two.y + two.sizeY >= one.y;
-
-	// collision only if on both axes
-	return collisionX && collisionY;
-}
-
 void gravityCheck() {
 	onGround = false;
 
@@ -420,87 +223,27 @@ void gravityCheck() {
 	}
 }
 
-// Draws a square and you can determine the size, position, and color.
-void drawSquare(float sizeX, float sizeY, float sizeZ, float x, float y, float z, float r, float g, float b) {
-	glPushMatrix();
-
-	glScalef(sizeX, sizeY, sizeZ);
-	glTranslatef(x, y, z);
-	glColor3f(r, g, b); // Light gray background
-	glBegin(GL_POLYGON);
-	glVertex3f(-0.5, -0.5, 0);
-	glVertex3f(0.5, -0.5, 0);
-	glVertex3f(0.5, 0.5, 0);
-	glVertex3f(-0.5, 0.5, 0);
-	glEnd();
-
-	glPopMatrix();
-}
-
-void drawTextWithBG(string text, float x, float y, float width, float height, bool showBG) {
-	// Calculate the position to center the text with background
-	float centerX = x - width / 2;
-	float centerY = y - height / 2;
-
-	// Draw the text background using the calculated center position
-	if (showBG) { // Turn background on or off
-		glColor3f(0.75f, 0.75f, 0.75f); // Light gray color for the background
-		// You can add more to change the color
-		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
-		glEnd();
-	}
-
-	// Adjust horizontal position to center the text horizontally within the backgound
-	float textX = centerX + 0.1;
-
-	// Adjust vertical position to center the text vertically within the background
-	float textY = centerY + (height - 0.2) / 2;
-
-	// Draw the button text
-	glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-	glRasterPos3f(textX, textY, 1);
-	for (int i = 0; i < text.length(); i++) {
-		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
-	}
-}
-
 void drawLeftPanel() {
 
 	glPushMatrix();
-	glViewport(0, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
+	glViewport(0, TOP_PANEL_H, SIDE_PANEL_W, WIN_H + TOP_PANEL_H);
 
-	// Dark Grey background
-	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
+	glScalef(4, 1, 1);
 
-	// Draw text box to label panel
-	drawTextWithBG("                 Hierarchy",
-		0, 6.6, 14, 0.8, true);
+	// Blue background
+	drawSquare(4, 9.5, 1, 0, 0, 0, 0, 0, 1);
 
-	// Draw the buttons
-	for (auto& button : leftPanelButtons) {
-		button.draw();
-	}
-
+	// Makes the player
+	//CreatePlayer(showCollision);
 	glPopMatrix();
 }
 
 void drawMainPanel() {
 	glPushMatrix();
-	glViewport(SIDE_PANEL_W, BOTTOM_PANEL_H, MAIN_PANEL_W, MIDDLE_PANEL_H);
+	glViewport(SIDE_PANEL_W, TOP_PANEL_H, MAIN_PANEL_W, WIN_H + TOP_PANEL_H);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-
-	// Make sure to set up the camera after the viewport but within the push and pop
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	// Set up the camera position and orientation
-	gluLookAt(cameraX, cameraY, 0.1, // Camera position
-		cameraX, cameraY, 0.0f,    // Look-at point (looking at the center of the scene)
-		0.0f, 1.0f, 0.0f);          // Up vector
+	glScalef(1.3, 1, 1);
 
 	// Makes the player
 	CreatePlayer(showCollision);
@@ -530,22 +273,14 @@ void drawMainPanel() {
 
 void drawRightPanel() {
 	glPushMatrix();
-	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
+	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, TOP_PANEL_H, SIDE_PANEL_W, WIN_H + TOP_PANEL_H);
+	glScalef(4, 1, 1);
 
 	// Green background
-	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
+	drawSquare(4, 9.5, 1, 0, 0, 0, 0, 1, 0);
 
-	// Draw text box to label panel
-	drawTextWithBG("                 Inscpector",
-		0, 6.6, 14, 0.8, true);
-
-	// Draw text box for x coordinate label
-	drawTextWithBG("X:",
-		-4, 5.6, 6, 0.5, true);
-
-	// Draw the text box
-	textInput.draw();
-
+	// Makes the player
+	//CreatePlayer(showCollision);
 	glPopMatrix();
 }
 
@@ -553,10 +288,10 @@ void drawTopPanel() {
 	glPushMatrix();
 	glViewport(0, WIN_H - TOP_PANEL_H, WIN_W, TOP_PANEL_H);
 
-	//glScalef(1, 20, 1);
+	glScalef(1, 20, 1);
 
-	// Blue background 
-	drawSquare(20, 20, 1, 0, 0, 0, 0.0, 0.0, 1.0);
+	// Grey background 
+	drawSquare(14, .7, 1, 0, 0, 0, 0.7, 0.7, 0.7);
 
 
 	glPopMatrix();
@@ -620,22 +355,10 @@ void specialKeyboardRelease(int key, int x, int y) {
 
 void Keyboard(unsigned char key, int x, int y)
 {
-	// Handle key press events for input boxes
-	textInput.handleKeyPress(key);
-
 	switch (key)
 	{
-	case 's': // Move camera up
-		cameraY -= 0.1f; // Adjust the value to control speed
-		break;
-	case 'a': // Move camera left
-		cameraX -= 0.1f;
-		break;
-	case 'w': // Move camera down
-		cameraY += 0.1f;
-		break;
-	case 'd': // Move camera right
-		cameraX += 0.1f;
+	case 's': // Show ground check
+		showCollision = !showCollision;
 		break;
 	case 32: // Spacebar
 		if (onGround && !jump) {
@@ -649,65 +372,6 @@ void Keyboard(unsigned char key, int x, int y)
 
 	glutPostRedisplay();
 }
-
-void MouseControl(int button, int state, int x, int y) {
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		// Initialize world coordinates and clicked panel
-		float worldX, worldY;
-		string clickedPanel;
-
-		// Determine which viewport was clicked
-		if (x >= 0 && x < SIDE_PANEL_W) {
-			// Left panel clicked
-			clickedPanel = "Left Panel";
-		}
-		else if (x >= SIDE_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W) {
-			// Main panel clicked
-			clickedPanel = "Main Panel";
-		}
-		else if (x >= SIDE_PANEL_W + MAIN_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W * 2) {
-			// Right panel clicked
-			clickedPanel = "Right Panel";
-		}
-		else {
-			// Main panel clicked
-			clickedPanel = "Main Panel";
-		}
-
-		if (y >= WIN_H - BOTTOM_PANEL_H) {
-			// Bottom panel clicked
-			clickedPanel = "Bottom Panel";
-		}
-		else if (y < TOP_PANEL_H) {
-			// Top panel clicked
-			clickedPanel = "Top Panel";
-		}
-
-		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
-
-		// Check if any button was clicked
-		for (auto& button : leftPanelButtons) {
-			if (button.isInside(x, y)) {
-				button.handleClick(); // Trigger the action associated with the button
-				break; // Exit the loop after handling the click for one button
-			}
-		}
-	}
-
-	// Check if clicked in or out of text box to set as active or not.
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		if (textInput.isInside(x, y)) {
-			textInput.setActive(true);
-		}
-
-		else {
-			textInput.setActive(false);
-		}
-	}
-
-	glutPostRedisplay();
-}
-
 
 void loadTextures() {
 	int i;
@@ -780,7 +444,7 @@ int main(int argc, char** argv) {
 
 	// Initialize window and create it
 	glutInitWindowSize(WIN_W, WIN_H);
-	glutCreateWindow("Text Box Entry Example");
+	glutCreateWindow("Panel Example");
 
 	glutTimerFunc(0, timer, 0);
 
@@ -793,7 +457,6 @@ int main(int argc, char** argv) {
 	glutKeyboardFunc(Keyboard);
 	glutSpecialFunc(specialKeyboard);
 	glutSpecialUpFunc(specialKeyboardRelease);
-	glutMouseFunc(MouseControl);
 
 	glutMainLoop();
 	return 0;
