@@ -7,7 +7,6 @@
 #include <array>
 #include <list>
 #include <iostream>
-#include <sstream>
 #include <functional>
 #include <IrrKlang/irrKlang.h>
 using namespace irrklang;
@@ -29,7 +28,7 @@ float jumpTimer = 10, resetJumpTimer;
 float jumpAcceleration = 1.0f; // Adjust this value for jump height
 float jumpVelocity = 0.5f; // Adjust this value for initial jump velocity
 
-bool showCollision = true;
+bool showCollision = false;
 
 bool lt, rt, jump, contact, onGround;
 
@@ -79,85 +78,6 @@ public:
 // Gameobjects on the screen
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, ground[3], collectible;
 
-class TextInput {
-public:
-	float x, y; // Position of the text input box in the viewport
-	float width, height; // Dimensions of the text input box in the viewport
-	float windowX, windowY; // Position of the button in the window
-	float windowWidth, windowHeight; // Dimensions of the button in the window
-	string text; // Text to be displayed in the text input box
-	GameObject* gameObject; // Used to get and set the variables of the game object
-	bool active; // Indicates whether the text input box is active (selected for input)
-
-	TextInput(float posX, float posY, float w, float h,
-		float winX, float winY, float winW, float winH, 
-		const string& txt)
-		: x(posX), y(posY), width(w), height(h),
-		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), active(false), gameObject(nullptr) {}
-
-	void setActive(bool isActive) {
-		active = isActive;
-	}
-
-	// Convert text to float
-	float textToFloat() {
-		float result;
-		stringstream ss(text);
-		ss >> result;
-		return result;
-	}
-
-	void handleKeyPress(unsigned char key) {
-		if (active) {
-			if (key == '\b' && !text.empty()) { // Backspace key
-				text.pop_back();
-			}
-			else if ((key >= '0' && key <= '9') || key == '.') {
-				text += key;
-			}
-			if(gameObject != nullptr)
-				// Update the x value whenever a valid character is entered
-				gameObject->x = textToFloat();
-		}
-	}
-
-	bool isInside(int mouseX, int mouseY) {
-		// Calculate the boundaries of the button
-		float leftBoundary = windowX - windowWidth / 2;
-		float rightBoundary = windowX + windowWidth / 2;
-		float bottomBoundary = windowY - windowHeight / 2;
-		float topBoundary = windowY + windowHeight / 2;
-
-		// Check if mouseX falls within the button's x-boundaries
-		bool insideX = (mouseX >= leftBoundary && mouseX <= rightBoundary);
-
-		// Check if mouseY falls within the button's y-boundaries
-		bool insideY = (mouseY >= bottomBoundary && mouseY <= topBoundary);
-
-		// Return true only if both mouseX and mouseY fall within the button's boundaries
-		return insideX && insideY;
-	}
-
-	void draw() {
-		// Draw the text input box background
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the text input box
-		glBegin(GL_QUADS);
-		glVertex2f(x, y);
-		glVertex2f(x + width, y);
-		glVertex2f(x + width, y + height);
-		glVertex2f(x, y + height);
-		glEnd();
-
-		// Draw the text inside the text input box
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos2f(x + 0.05f, y + (height / 2) - 0.05f); // Adjust position for centering
-		for (char c : text) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
-		}
-	}
-};
-
 // Button class
 class Button {
 public:
@@ -166,15 +86,16 @@ public:
 	float windowX, windowY; // Position of the button in the window
 	float windowWidth, windowHeight; // Dimensions of the button in the window
 	string text; // Text to be displayed on the button
-	bool clicked; // Indicates whether the button has been clicked
+	bool toggleButton; // Determine if it is a toggle button or not
+	bool toggled; // Indicates whether the button has been clicked
 	function<void()> buttonAction; // Action handler for the button
 
 	Button(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
-		function<void()> act, const string& txt)
+		function<void()> act, const string& txt, bool toggleButton)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false) {}
+		text(txt), buttonAction(act), toggleButton(toggleButton), toggled(false) {}
 
 	bool isInside(int mouseX, int mouseY) {
 		// Calculate the boundaries of the button
@@ -195,8 +116,12 @@ public:
 
 	// Method to handle button click
 	void handleClick() {
-		if (buttonAction) {
+		toggled = !toggled;
+		if (buttonAction && !toggleButton) {
 			buttonAction(); // Invoke the action handler
+		}
+		if (buttonAction && toggleButton) {
+			buttonAction(); // Invoke the toggle action handler
 		}
 	}
 
@@ -207,7 +132,7 @@ public:
 		float centerY = y - height / 2;
 
 		// Draw the button background using the calculated center position
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
+		glColor3f(0.7f, 0.7f, 0.7f); // Light gray color for the button
 		glBegin(GL_QUADS);
 		glVertex3f(centerX, centerY, 0);
 		glVertex3f(centerX + width, centerY, 0);
@@ -221,20 +146,54 @@ public:
 		// Adjust vertical position to center the text vertically within the button
 		float textY = centerY + (height - 0.2) / 2;
 
-		// Draw the button text
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos3f(textX, textY, 1);
-		for (int i = 0; i < text.length(); i++) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
+		if (!toggleButton) {
+			// Draw the button text
+			glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
+			glRasterPos3f(textX, textY, 1);
+			for (int i = 0; i < text.length(); i++) {
+				glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
+			}
 		}
+
+		else {
+			// Define separate width and height for the smaller square
+			float smallSquareWidth = width * 0.6f;
+			float smallSquareHeight = height * 0.6f;
+
+			// Calculate the position to center the smaller square
+			float smallSquareX = centerX + (width - smallSquareWidth) / 2;
+			float smallSquareY = centerY + (height - smallSquareHeight) / 2;
+
+			// Draw the button background using the calculated center position
+			if (toggled) {
+				// Draw a smaller filled square inside the button
+				glColor3f(0.0f, 1.0f, 0.0f); // White color for the small square
+				glBegin(GL_QUADS);
+				glVertex3f(smallSquareX, smallSquareY, 0);
+				glVertex3f(smallSquareX + smallSquareWidth, smallSquareY, 0);
+				glVertex3f(smallSquareX + smallSquareWidth, smallSquareY + smallSquareHeight, 0);
+				glVertex3f(smallSquareX, smallSquareY + smallSquareHeight, 0);
+				glEnd();
+			}
+			else {
+				// Draw a smaller filled square inside the button
+				glColor3f(1.0f, 1.0f, 1.0f); // White color for the small square
+				glBegin(GL_QUADS);
+				glVertex3f(smallSquareX, smallSquareY, 0);
+				glVertex3f(smallSquareX + smallSquareWidth, smallSquareY, 0);
+				glVertex3f(smallSquareX + smallSquareWidth, smallSquareY + smallSquareHeight, 0);
+				glVertex3f(smallSquareX, smallSquareY + smallSquareHeight, 0);
+				glEnd();
+			}
+		}
+		
 	}
 };
 
+
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
 list<Button> leftPanelButtons;
-
-// Text input variable
-TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 33, 7, "");
+list<Button> rightPanelButtons;
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
@@ -258,17 +217,10 @@ void buttonAction2() {
 	printf("Completed action 2 \n");
 }
 
-void buttonAction3() {
+void toggleAction() {
 	// Define actions for buttons
 	showCollision = !showCollision;
-	printf("Completed action 3 \n");
-}
-
-void buttonAction4() {
-	// Define actions for buttons
-	textInput.text = to_string(ground[0].x);
-	textInput.gameObject = &ground[0];
-	printf("Completed action 4 \n");
+	printf("Toggle action \n");
 }
 
 void init(void) {
@@ -309,21 +261,18 @@ void init(void) {
 	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
 
 	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green");
+	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, buttonAction1, "Make Ground Green", false);
 	// Add buttons to list
 	leftPanelButtons.push_back(button1);
 
 	// Top left corner is (0, 0), so if you want to make a list of 
 	// buttons that you can just add, you'll need to add to the 
 	// windowY rather than subtract to go down the window.
-	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple");
+	Button button2(0, button1.y - 0.7, 14, 0.5, 100, button1.windowY + 30, 200, 20, buttonAction2, "Make Ground Purple", false);
 	leftPanelButtons.push_back(button2);
 
-	Button button3(0, button2.y - 0.7, 14, 0.5, 100, button2.windowY + 30, 200, 20, buttonAction3, "Show Player Collider");
-	leftPanelButtons.push_back(button3);
-
-	Button button4(0, button3.y - 0.7, 14, 0.5, 100, button3.windowY + 30, 200, 20, buttonAction4, "Ground 1");
-	leftPanelButtons.push_back(button4);
+	Button toggleButton1(0, 5.6, 1.5, 0.5, 900, 110, 20, 20, toggleAction, "Show Player Collider", true);
+	rightPanelButtons.push_back(toggleButton1);
 }
 
 void CreatePlayer(bool show) {
@@ -521,19 +470,21 @@ void drawRightPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
 
-	// Green background
+	// Dark Grey background
 	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
 
 	// Draw text box to label panel
-	drawTextWithBG("                 Inscpector",
+	drawTextWithBG("                 Inspector",
 		0, 6.6, 14, 0.8, true);
 
-	// Draw text box for x coordinate label
-	drawTextWithBG("X:",
+	// Draw text box for show player colliders toggle
+	drawTextWithBG("Show Collider:",
 		-4, 5.6, 6, 0.5, true);
 
-	// Draw the text box
-	textInput.draw();
+	// Draw the buttons
+	for (auto& button : rightPanelButtons) {
+		button.draw();
+	}
 
 	glPopMatrix();
 }
@@ -609,9 +560,6 @@ void specialKeyboardRelease(int key, int x, int y) {
 
 void Keyboard(unsigned char key, int x, int y)
 {
-	// Handle key press events for input boxes
-	textInput.handleKeyPress(key); 
-
 	switch (key)
 	{
 	case 's': // Show ground check
@@ -672,20 +620,14 @@ void MouseControl(int button, int state, int x, int y) {
 				break; // Exit the loop after handling the click for one button
 			}
 		}
-	}
 
-	// Check if clicked in or out of text box to set as active or not.
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		if (textInput.isInside(x, y)) {
-			textInput.setActive(true);
-		}
-
-		else {
-			textInput.setActive(false);
+		for (auto& button : rightPanelButtons) {
+			if (button.isInside(x, y)) {
+				button.handleClick(); // Trigger the action associated with the button
+				break; // Exit the loop after handling the click for one button
+			}
 		}
 	}
-
-	glutPostRedisplay();
 }
 
 
@@ -760,7 +702,7 @@ int main(int argc, char** argv) {
 
 	// Initialize window and create it
 	glutInitWindowSize(WIN_W, WIN_H);
-	glutCreateWindow("Text Box Entry Example");
+	glutCreateWindow("Toggle Button Example");
 
 	glutTimerFunc(0, timer, 0);
 
