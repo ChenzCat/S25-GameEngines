@@ -999,19 +999,18 @@ void drawLeftPanelBackground()
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
+	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.5f, 0.0f, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 	glPopMatrix();
 }
 
 void drawLeftPanelHierarchyTitle()
 {
 	glPushMatrix();
-	glViewport(0, BOTTOM_PANEL_H, SIDE_PANEL_W, MAIN_PANEL_H);
 	glMatrixMode(GL_PROJECTION); 
 	glLoadIdentity();
 	glOrtho(-7.0, 7.0, 0.0, 9.5, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawTextWithBG("                 Hierarchy", 0.0f, 9.3, 14.0f, 0.4f, true);
+	drawTextWithBG("                       Hierarchy", 0.0f, 9.3, 14.0f, 0.4f, true);
 
 	for (auto& button : leftPanelButtons) {
 		button.draw();
@@ -1037,12 +1036,28 @@ void drawRightPanelBackground()
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.0f, 0.0f, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 	glPopMatrix();
+}
+
+void drawRightPanelInspectorTitle()
+{
+	glPushMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-7.0, 7.0, 0.0, 9.5, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	drawTextWithBG("                         Inspector", 0.0f, 9.3, 14.0f, 0.4f, true);
+
+	for (auto& button : leftPanelButtons) {
+		button.draw();
+	}
+	glPushMatrix();
 }
 
 void drawRightPanel() {
 	drawRightPanelBackground();
+	drawRightPanelInspectorTitle();
 }
 
 // Top Panel
@@ -1054,7 +1069,7 @@ void drawTopPanelBackground()
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawSquare(2.0f, 2.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.7f, 0.7f, 0.7f);
+	drawSquare(2.0f, 2.0f, 1.0f, 0.0f, 0.0f, 0.0f, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 	glPopMatrix();
 
 }
@@ -1112,7 +1127,7 @@ void drawBottomPanel() {
 	glOrtho(0, 1, 0, 1, -1, 1);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	drawSquare(14, 3, 1, 0, 0, 0, 1, 0, 0);
+	drawSquare(14, 3, 1, 0, 0, 0, /* Red */ 42.0f / 255.0f, /* Green */ 30.0f / 255.0f, /* Blue */ 40.0f / 255.0f);
 
 	// Draw all bottom panel buttons.
 	for (auto& button : bottomPanelButtons) {
