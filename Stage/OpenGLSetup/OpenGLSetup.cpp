@@ -842,6 +842,7 @@ void drawAxis()
 // Physics
 void gravityCheck()
 {
+	if (currentScene != GameScene) return;
 	onGround = false;
 
 	// If bottomCheck collides with any ground object: onGround=true
@@ -892,8 +893,10 @@ void gravityCheck()
 		player.y -= gravity;
 	}
 
-	if (player.y < -10.0)
-	{ // Out of bounds. Used with out of bounds collider for future use. 
+	if (currentScene != GameScene) return;
+
+	if (currentScene == GameScene && player.y < -10.0)
+	{
 		currentScene = LoseScene;
 		playLoseMusic();
 	}
@@ -1016,34 +1019,57 @@ void drawLeftPanel()
 {
 	drawLeftPanelBackground();
 	drawLeftPanelHierarchyTitle();
+	//drawLeftPanelAdaptiveHierarchy();
 }
 
-// Right Panel |  Source: Panel Example
-void drawRightPanel() {
+// Right Panel
+
+void drawRightPanelBackground()
+{
+	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MAIN_PANEL_H);
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	glPopMatrix();
 }
 
-// Top Panel |  Source: Panel Example
-void drawTopPanel() {
+void drawRightPanel() {
+	drawRightPanelBackground();
+}
+
+// Top Panel
+
+void drawTopPanelBackground()
+{
+	glPushMatrix();
 	glViewport(0, WIN_H - TOP_PANEL_H, WIN_W, TOP_PANEL_H);
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
 	drawSquare(14.0f, 0.7f, 1.0f, 0.0f, 0.0f, 0.0f, 0.7f, 0.7f, 0.7f);
+	glPopMatrix();
 
+}
+
+void drawTopPanelMessages()
+{
 	if (currentScene == EditScene)
 	{
+		
 		glColor3f(0.0, 0.0, 0.0);
-		glRasterPos3f(0.05f, 0.6f, 0.0f);
+		glRasterPos3f(0.05f, 0.0f, 0.0f);
 		const char* editLabel = "Edit Mode Active";
 		for (int i = 0; editLabel[i] != '\0'; ++i)
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, editLabel[i]);
+		
+	}
+}
 
-		// Grid toggle button (top-right corner)
+void drawTopPanelButtons()
+{
+	// Grid toggle button (top-right corner)
 		//Button toggleGridButton(
 		//	0.93f, 0.4f,     // x, y in ortho space (0.0 to 1.0)
 		//	0.06f, 0.25f,    // width, height
@@ -1062,7 +1088,13 @@ void drawTopPanel() {
 	//		}, "Play", false
 	//	);
 	//	togglePlayButton.draw();
-	}
+}
+
+void drawTopPanel() 
+{
+	drawTopPanelBackground();
+	//drawTopPanelMessages();
+
 }
 
 // Bottom Panel |  Source: Panel Example
@@ -1203,13 +1235,13 @@ void ActiveGame()
 	// Apply Gravity + Collision
 	gravityCheck();
 
-	if (CheckCollision(player, hazard))
+	if (currentScene == GameScene && CheckCollision(player, hazard))
 	{
 		currentScene = LoseScene;
 		playLoseMusic();
 	}
 
-	if (CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee)
+	if (currentScene == GameScene && CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee)
 	{
 		currentScene = WinScene;
 		playWinMusic();
@@ -1449,6 +1481,7 @@ void Keyboard(unsigned char key, int x, int y)
 	case 'z': // Toggle grid in edit mode
 		if (currentScene == EditScene)
 			gridMode = !gridMode;
+
 		break;
 	}
 
@@ -1588,7 +1621,7 @@ void timer(int v)
 	{
 		timeLeft--;
 		gameTimerAccumulator = 0;
-		if (timeLeft <= 0)
+		if (currentScene == GameScene && timeLeft <= 0)
 		{
 			currentScene = LoseScene;
 			playLoseMusic();
@@ -1623,7 +1656,6 @@ void timer(int v)
 	cycleRunFrames();
 	updateAnimationFrame();
 	glutPostRedisplay();
-	glutTimerFunc(100, timer, 0);
 }
 
 //-------------------------------------------------------------------------------------------------------------
