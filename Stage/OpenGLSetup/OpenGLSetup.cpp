@@ -27,7 +27,7 @@ class GameObject;
 #define WIN_H 875
 
 #define SIDE_PANEL_W 250       
-#define TOP_PANEL_H   100
+#define TOP_PANEL_H   30
 #define MIDDLE_PANEL_H 600
 #define BOTTOM_PANEL_H 175        
 #define MAIN_PANEL_W (WIN_W - 2*SIDE_PANEL_W)
@@ -322,7 +322,12 @@ list<Button> bottomPanelButtons;
 void drawGrid()
 {
 	glPushMatrix();
-	glTranslatef(cameraX, cameraY, 0.0f);
+	
+	if (currentScene == EditScene)
+		glTranslatef(editorCameraX, editorCameraY, 0.0f);
+	else
+		glTranslatef(cameraX, cameraY, 0.0f);
+
 	glColor3f(0.3f, 0.3f, 0.3f); // Grid line color
 
 	float gridSize = 1.0f;  // Size of each square
@@ -339,7 +344,6 @@ void drawGrid()
 		glVertex3f(gridExtent * gridSize, i * gridSize, 0.0f);
 	}
 	glEnd();
-
 	glPopMatrix();
 
 }
@@ -934,6 +938,8 @@ void onReshape(int w, int h)
 
 void editorCameraLogic()
 {
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
 		gluLookAt(editorCameraX, editorCameraY, 5, editorCameraX, editorCameraY, 0, 0, 1, 0);
 }
 
@@ -993,7 +999,7 @@ void drawLeftPanelBackground()
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	drawSquare(4.0f, 9.5f, 1.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
 	glPopMatrix();
 }
 
@@ -1048,7 +1054,7 @@ void drawTopPanelBackground()
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawSquare(14.0f, 0.7f, 1.0f, 0.0f, 0.0f, 0.0f, 0.7f, 0.7f, 0.7f);
+	drawSquare(2.0f, 2.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.7f, 0.7f, 0.7f);
 	glPopMatrix();
 
 }
@@ -1344,8 +1350,10 @@ void GlobalValues() // MUST EDIT
 
 void EditorScene()
 {
-	editorVisualized();
+	
 	editorCameraLogic();
+
+	editorVisualized();
 
 
 
@@ -1386,25 +1394,43 @@ void MyDisplay()
 
 void specialKeyboard(int key, int x, int y)
 {
+	if (currentScene == EditScene) {
+		switch (key)
+		{
+		case GLUT_KEY_LEFT:
+			editorCameraX -= 0.5f;
+			break;
+		case GLUT_KEY_RIGHT:
+			editorCameraX += 0.5f;
+			break;
+		case GLUT_KEY_UP:
+			editorCameraY += 0.5f;
+			break;
+		case GLUT_KEY_DOWN:
+			editorCameraY -= 0.5f;
+			break;
+		}
+	}
+	else if (currentScene == GameScene) {
+		switch (key)
+		{
+		case GLUT_KEY_LEFT:
+			lt = true;
+			rt = false;
+			currentState = RunLeft;
+			facingLeft = true;
+			break;
 
-	switch (key)
-	{
-	case GLUT_KEY_LEFT:
-		lt = true;
-		rt = false;
-		currentState = RunLeft;
-		facingLeft = true;
-		break;
-
-	case GLUT_KEY_RIGHT:
-		lt = false;
-		rt = true;
-		currentState = RunRight;
-		facingLeft = false;
-		break;
+		case GLUT_KEY_RIGHT:
+			lt = false;
+			rt = true;
+			currentState = RunRight;
+			facingLeft = false;
+			break;
+		}
 	}
 
-	glutPostRedisplay();
+	glutPostRedisplay(); // Redraw with the new camera position
 }
 
 void specialKeyboardRelease(int key, int x, int y)
