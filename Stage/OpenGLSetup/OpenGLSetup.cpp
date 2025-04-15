@@ -24,8 +24,8 @@ class GameObject;
 
 #define WindowX 0
 #define WindowY 0
-#define WIN_W 1400
-#define WIN_H 875
+#define WIN_W 1200
+#define WIN_H 675
 
 #define SIDE_PANEL_W 250       
 #define TOP_PANEL_H   30
@@ -885,6 +885,38 @@ void init(void)
 	leftCheck.colorR = 0;
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
+
+
+	// Create buttons and add them to the list
+	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
+	// Add buttons to list
+	leftPanelButtons.push_back(button1);
+
+
+	// Create buttons and add them to the list
+	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
+	// Add buttons to list
+	rightPanelButtons.push_back(button1);
+
+
+
+
+
+	Button bottomButton(
+		0,		// Position X
+		0,		// Position Y
+		1,		// Width
+		8,	// Height
+		100,	// WindowX
+		92,		// WindowY
+		200,	// Window Width
+		20,		// Window Height
+
+		buttonAddGround,	// Function
+		"Ground"			// Title
+	);
+
+	bottomPanelButtons.push_back(bottomButton);
 }
 
 void CreateMechanics()
@@ -1186,7 +1218,7 @@ void drawRightPanelInspectorTitle()
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
 	drawTextWithBG("                         Inspector", 0.0f, 9.3, 14.0f, 0.4f, true);
 
-	for (auto& button : leftPanelButtons) {
+	for (auto& button : rightPanelButtons) {
 		button.draw();
 	}
 	glPushMatrix();
@@ -1290,11 +1322,6 @@ void drawBottomPanelBackground()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	drawSquare(14, 3, 1, 0, 0, 0, /* Red */ 42.0f / 255.0f, /* Green */ 30.0f / 255.0f, /* Blue */ 40.0f / 255.0f);
-
-	// Draw all bottom panel buttons.
-	for (auto& button : bottomPanelButtons) {
-		button.draw();
-	}
 }
 
 void drawBottomPanelTitle()
@@ -1308,12 +1335,21 @@ void drawBottomPanelTitle()
 
 }
 
+void drawBottomPanelButtons()
+{
+	// Draw all bottom panel buttons.
+	for (auto& button : bottomPanelButtons) 
+	{
+		button.drawAssetButton();
+	}
+}
 
 // Bottom Panel |  Source: Panel Example
 void drawBottomPanel() 
 {
 	drawBottomPanelBackground();
 	drawBottomPanelTitle();
+	drawBottomPanelButtons();
 
 
 }
