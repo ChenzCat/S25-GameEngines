@@ -11,6 +11,7 @@
 #include <array>
 #include <list>
 #include <iostream>
+#include <sstream>
 #include <functional>
 #include <string>
 #include <IrrKlang/irrKlang.h>
@@ -40,6 +41,7 @@ class GameObject;
 GameObject* selectedObject = nullptr;
 bool gridMode = true;
 bool dragging = false;
+bool displaySceneStateDisplay = true;
 
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
@@ -237,35 +239,159 @@ char* sfxMusic[1] =
 	(char*)"audio/Jump.ogg"
 };
 
-//------------------------------------------------------------------------------------------------------------
-// Button class
-class Button {
+//-------------------------------------------------------------------------------------------------------------
+// Gameobject class
+class GameObject
+{
 public:
-	float x, y;									// Position of the button in the viewport
-	float width, height;						// Dimensions of the button in the viewport
-	float windowX, windowY;						// Position of the button in the window
-	float windowWidth, windowHeight;			// Dimensions of the button in the window
-	string text;								// Text to be displayed on the button
-	bool toggleButton;							// Determine if it is a toggle button or not (Color)
-	bool toggled;								// Indicates whether the button has been clicked
-	function<void(Button&)> buttonAction; 		// Action handler for the button
-	GameObject* gameObject;						// Used to get and set the variables of the game object
-	int textureNum;								// Texture number
-	bool sprite;								// If there is a sprite or not
+	// Position and size
+	GLfloat   x, y, z, sizeX, sizeY;
 
-	// Button Constructor
-	Button(float posX, float posY, float w, float h,
+	// RGB color
+	GLfloat   colorR, colorG, colorB;
+
+	// Additional properties
+	GLfloat   mass;
+	bool	  canSee;		// Visable Object
+	bool      isSolid;		// Block Objects
+	bool      destroyed;	// Remove Object
+	bool      gravity;		// Gravity affects the object
+	int		  textureIndex; // Texture Use
+
+	GameObject();	// Constructor
+
+	void DrawGameObject(bool sprite);
+	void DrawPlayer(bool sprite);
+};
+
+//-------------------------------------------------------------------------------------------------------------
+// Global Objects
+
+// Player and its Collision Boxes
+GameObject player, bottomCheck, leftCheck, rightCheck, topCheck;
+
+// Total Tiles, Collectibles, Hazards, Exits
+std::list<GameObject> platforms;
+std::list<GameObject> collectibles;
+std::list<GameObject> hazards;
+std::list<GameObject> exits;
+
+
+
+
+
+// Create Ground (Visable/Invisable)
+GameObject CreateGround(float x, float y, float width, float height, bool collider = true, bool visable = true, int texIndex = -1)
+{
+	GameObject ground;
+	ground.x = x;						// X Axis Origin
+	ground.y = y;						// Y Axis Origin
+	ground.sizeX = width;				// Width
+	ground.sizeY = height;				// Height
+	ground.isSolid = collider;			// Collision
+	ground.canSee = visable;			// Visibility
+	ground.textureIndex = texIndex;		// Store Texture Index
+	return ground;
+}
+
+// Create Collectible
+GameObject CreateCollectible(float x, float y, bool collider = true)
+{
+	GameObject Collectible;
+	Collectible.x = x;
+	Collectible.y = y;
+	Collectible.sizeX = 0.3f;
+	Collectible.sizeY = 0.4f;
+	Collectible.isSolid = collider;
+	Collectible.canSee = true;
+	Collectible.destroyed = false;
+	Collectible.textureIndex = 18;		// Fixed animation
+	return Collectible;
+}
+
+// Create Hazard
+GameObject CreateHazard(float x, float y, float width, float height, bool collider, bool visable, int texIndex = -1)
+{
+	GameObject Hazard;
+	Hazard.x = x;
+	Hazard.y = y;
+	Hazard.sizeX = width;
+	Hazard.sizeY = height;
+	Hazard.isSolid = collider;
+	Hazard.canSee = visable;
+	Hazard.destroyed = false;
+	Hazard.textureIndex = -1;		// Fixed animation
+
+	Hazard.colorR = 1.0f;
+	Hazard.colorG = 0.0f;
+	Hazard.colorB = 0.0f;
+
+	return Hazard;
+}
+
+GameObject CreateExit(float x, float y, float width, float height, bool collider, bool visable, int texIndex = -1)
+{
+	GameObject Exit;
+	Exit.x = x;
+	Exit.y = y;
+	Exit.sizeX = width;
+	Exit.sizeY = height;
+	Exit.isSolid = collider;
+	Exit.canSee = visable;
+	Exit.destroyed = false;
+	Exit.textureIndex = -1;
+
+	Exit.colorR = 0.0f;
+	Exit.colorG = 1.0f;
+	Exit.colorB = 0.0f;
+
+	return Exit;
+}
+
+class TextInput {
+public:
+	float x, y; // Position of the text input box in the viewport
+	float width, height; // Dimensions of the text input box in the viewport
+	float windowX, windowY; // Position of the button in the window
+	float windowWidth, windowHeight; // Dimensions of the button in the window
+	string text; // Text to be displayed in the text input box
+	GameObject* gameObject; // Used to get and set the variables of the game object
+	bool active; // Indicates whether the text input box is active (selected for input)
+
+	TextInput(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
-		function<void(Button&)> act, const string& txt,
-		GameObject* obj = nullptr,
-		bool isToggle = false, bool sprite = false, int texture = -1
-	) : x(posX), y(posY), width(w), height(h),
+		const string& txt)
+		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), toggleButton(isToggle), toggled(false),
-		gameObject(obj), sprite(sprite), textureNum(texture) {
+		text(txt), active(false), gameObject(nullptr) {
 	}
 
-	// Hit detection
+	void setActive(bool isActive) {
+		active = isActive;
+	}
+
+	// Convert text to float
+	float textToFloat() {
+		float result;
+		stringstream ss(text);
+		ss >> result;
+		return result;
+	}
+
+	void handleKeyPress(unsigned char key) {
+		if (active) {
+			if (key == '\b' && !text.empty()) { // Backspace key
+				text.pop_back();
+			}
+			else if ((key >= '0' && key <= '9') || key == '.' || key == '-') {
+				text += key;
+			}
+			if (gameObject != nullptr)
+				// Update the x value whenever a valid character is entered
+				gameObject->x = textToFloat();
+		}
+	}
+
 	bool isInside(int mouseX, int mouseY) {
 		// Calculate the boundaries of the button
 		float leftBoundary = windowX - windowWidth / 2;
@@ -283,18 +409,7 @@ public:
 		return insideX && insideY;
 	}
 
-
-	// Handle click action
-	void handleClick() {
-		if (buttonAction) {
-			buttonAction(*this);
-			if (toggleButton) toggled = !toggled;
-		}
-	}
-
-	// Method to draw the button
-	void draw()
-	{
+	void draw() {
 		// Draw the text input box background
 		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the text input box
 		glBegin(GL_QUADS);
@@ -314,15 +429,208 @@ public:
 };
 
 
+
+//------------------------------------------------------------------------------------------------------------
+// Button class
+class Button {
+public:
+	float x, y; // Position of the button in the viewport
+	float width, height; // Dimensions of the button in the viewport
+	float windowX, windowY; // Position of the button in the window
+	float windowWidth, windowHeight; // Dimensions of the button in the window
+	string text; // Text to be displayed on the button
+	bool clicked; // Indicates whether the button has been clicked
+	function<void(Button&)> buttonAction; // Action handler for the button
+	// Had to update here to allow for button passing
+	GameObject* gameObject; // Used to get and set the variables of the game object
+	int textureNum; // Texture number
+	bool sprite; // If there is a sprite or not
+
+	// x, y, w, h, windowX, windowY, windowWidth, windowHeight, text, buttonAction, gameObject pointer
+	// Updated to allow for the passing of a gameObject reference but is not necessary
+	Button(float posX, float posY, float w, float h,
+		float winX, float winY, float winW, float winH,
+		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
+		: x(posX), y(posY), width(w), height(h),
+		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
+		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false) {
+	}
+
+	bool isInside(int mouseX, int mouseY) {
+		// Calculate the boundaries of the button
+		float leftBoundary = windowX - windowWidth / 2;
+		float rightBoundary = windowX + windowWidth / 2;
+		float bottomBoundary = windowY - windowHeight / 2;
+		float topBoundary = windowY + windowHeight / 2;
+
+		// Check if mouseX falls within the button's x-boundaries
+		bool insideX = (mouseX >= leftBoundary && mouseX <= rightBoundary);
+
+		// Check if mouseY falls within the button's y-boundaries
+		bool insideY = (mouseY >= bottomBoundary && mouseY <= topBoundary);
+
+		// Return true only if both mouseX and mouseY fall within the button's boundaries
+		return insideX && insideY;
+	}
+
+	// Method to handle button click
+	void handleClick() {
+		if (buttonAction) {
+			buttonAction(*this); // Invoke the action handler and passes the button now
+		}
+	}
+
+	// Method to draw the button
+	void draw() {
+		// Calculate the position to center the button
+		float centerX = x - width / 2;
+		float centerY = y - height / 2;
+
+		// Draw the button background using the calculated center position
+		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
+		glBegin(GL_QUADS);
+		glVertex3f(centerX, centerY, 0);
+		glVertex3f(centerX + width, centerY, 0);
+		glVertex3f(centerX + width, centerY + height, 0);
+		glVertex3f(centerX, centerY + height, 0);
+		glEnd();
+
+		// Adjust horizontal position to center the text horizontally within the button
+		float textX = centerX + 0.1;
+
+		// Adjust vertical position to center the text vertically within the button
+		float textY = centerY + (height - 0.2) / 2;
+
+		// Draw the button text
+		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
+		glRasterPos3f(textX, textY, 1);
+		for (int i = 0; i < text.length(); i++) {
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
+		}
+	}
+
+	void drawAssetButton() {
+		// Calculate the position to center the button
+		float centerX = x - width / 2;
+		float centerY = y - height / 2;
+
+		// Draw the button background using the calculated center position
+		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
+		glBegin(GL_QUADS);
+		glVertex3f(centerX, centerY, 0);
+		glVertex3f(centerX + width, centerY, 0);
+		glVertex3f(centerX + width, centerY + height, 0);
+		glVertex3f(centerX, centerY + height, 0);
+		glEnd();
+
+		float widthAdjust = centerX + width / 10;
+		float heightAdjust = centerY + height / 3;
+
+		if (sprite) {
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			glEnable(GL_TEXTURE_2D); // Enable texturing
+
+			glBindTexture(GL_TEXTURE_2D, texID[textureNum]); // Which texture
+
+			glBegin(GL_POLYGON);
+			glTexCoord2f(0.0, 0.0);
+			glVertex3f(widthAdjust, heightAdjust, 0);
+			glTexCoord2f(1.0, 0.0);
+			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust, 0);
+			glTexCoord2f(1.0, 1.0);
+			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust + (height / 2), 0);
+			glTexCoord2f(0.0, 1.0);
+			glVertex3f(widthAdjust, heightAdjust + (height / 2), 0);
+			glEnd();
+
+			glDisable(GL_TEXTURE_2D); // Turn texturing off
+		}
+
+		else {
+			glColor3f(1, 0, 1); // Purple color for the sprite in the button
+			glBegin(GL_QUADS);
+			glVertex3f(widthAdjust, heightAdjust, 0);
+			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust, 0);
+			glVertex3f(widthAdjust + (width - (width / 10) * 2), heightAdjust + (height / 2), 0);
+			glVertex3f(widthAdjust, heightAdjust + (height / 2), 0);
+			glEnd();
+		}
+
+		// Adjust horizontal position to center the text horizontally within the button
+		float textX = centerX + 0.1;
+
+		// Adjust vertical position to center the text vertically within the button
+		float textY = centerY + (height / 10);
+
+		// Draw the button text
+		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
+		glRasterPos3f(textX, textY, 1);
+		for (int i = 0; i < text.length(); i++) {
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
+		}
+	}
+
+	// Static method to create and add a new button to a specified list
+	static void addToList(list<Button>& buttonList, float x, float y, float w, float h,
+		float winX, float winY, float winW, float winH,
+		function<void(Button&)> action, const string& text, GameObject* obj) {
+
+		// Create a new button instance and add it to the list
+		buttonList.emplace_back(x, y, w, h, winX, winY, winW, winH, action, text, obj);
+	}
+};
+
+
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
 list<Button> leftPanelButtons;
 list<Button> rightPanelButtons;
 list<Button> bottomPanelButtons;
+list<Button> topPanelButtons;
+
+
+
+TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
+
+// Give buttons functions by making functions and 
+// assiging them when the button is made.
+void hierarchyButton(Button& button) {
+	if (button.gameObject != nullptr) {
+		// Update textInput with gameObject's x-coordinate
+		textInput.text = to_string(button.gameObject->x);
+		textInput.gameObject = button.gameObject;
+	}
+	else {
+		cout << "Button's gameObject is null" << endl;
+	}
+
+	cout << "Completed button action" << endl;
+}
+
+// Adds a ground asset to the game
+void buttonAddGround(Button& button) {
+	// Define actions for buttons
+	GameObject ground;
+	ground.colorG = 0;
+	platforms.emplace_back(ground);
+
+	// Top left corner is (0, 0), so if you want to make a list of 
+	// buttons that you can just add, you'll need to add to the 
+	// windowY rather than subtract to go down the window.
+	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		100, leftPanelButtons.back().windowY + 30, 200, 20,
+		hierarchyButton, "Ground " + to_string(leftPanelButtons.size()), &platforms.back());
+
+	printf("Completed action add ground \n");
+}
+
+
+
 
 void drawGrid()
 {
 	glPushMatrix();
-	
+
 	if (currentScene == EditScene)
 		glTranslatef(editorCameraX, editorCameraY, 0.0f);
 	else
@@ -347,6 +655,36 @@ void drawGrid()
 	glPopMatrix();
 
 }
+
+void buttonDrawGrid()
+{
+
+}
+
+void buttonAddPlatform(Button& button)
+{
+	platforms.emplace_back(CreateGround(0.0f, 0.0f, 1.0f, 1.0f, true, 54));
+	printf("Platform added\n");
+}
+
+void buttonAddCollectible(Button& button)
+{
+	collectibles.emplace_back(CreateCollectible(0.0f, 0.0f));
+	printf("Collectible added\n");
+}
+
+void buttonAddHazard(Button& button)
+{
+	hazards.emplace_back(CreateHazard(0.0f, 0.0f, 1.0f, 1.0f, true, false));
+	printf("Hazard added\n");
+}
+
+void buttonAddExit(Button& button)
+{
+	exits.emplace_back(CreateExit(0.0f, 0.0f, 1.0f, 1.0f, true, false));
+	printf("Exit added\n");
+}
+
 
 
 // Create Button Function (Automatic Panel Adjustment)
@@ -433,10 +771,6 @@ void populateHierarchyButtons()
 
 
 
-
-
-
-
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
 void buttonAction1() {
@@ -476,195 +810,6 @@ void spawnBlockAction() {
 
 
 
-//-------------------------------------------------------------------------------------------------------------
-// Gameobject class
-class GameObject
-{
-public:
-	// Position and size
-	GLfloat   x, y, z, sizeX, sizeY;
-
-	// RGB color
-	GLfloat   colorR, colorG, colorB;
-
-	// Additional properties
-	GLfloat   mass;
-	bool	  canSee;		// Visable Object
-	bool      isSolid;		// Block Objects
-	bool      destroyed;	// Remove Object
-	bool      gravity;		// Gravity affects the object
-	int		  textureIndex; // Texture Use
-
-	GameObject();	// Constructor
-
-	void DrawGameObject(bool sprite);
-	void DrawPlayer(bool sprite);
-};
-
-//-------------------------------------------------------------------------------------------------------------
-// Global Objects
-
-// Player and its Collision Boxes
-GameObject player, bottomCheck, leftCheck, rightCheck, topCheck;
-
-// Total Tiles, Collectibles, Hazards, Exits
-GameObject ground[1000], collectible[10], hazard, mapExit;
-
-// Blocks (Platforms and Walls)
-GameObject CreateGround(float x, float y, float width, float height, bool collider = true, int texIndex = -1)
-{
-	GameObject ground;
-	ground.x = x;						// X Axis Origin
-	ground.y = y;						// Y Axis Origin
-	ground.sizeX = width;				// Width
-	ground.sizeY = height;				// Height
-	ground.isSolid = collider;			// Collision
-	ground.canSee = true;				// Visibility
-	ground.textureIndex = texIndex;		// Store Texture Index
-	return ground;
-}
-
-// Invisible Collider
-GameObject createInvisibleCollider(float x, float y, float width, float height) // Plan to Refit this for future use
-{
-	GameObject collider;
-	collider.x = x;
-	collider.y = y;
-	collider.sizeX = width;
-	collider.sizeY = height;
-
-	collider.isSolid = true;
-	collider.canSee = false;
-	collider.colorR = 1.0f;
-	collider.colorG = 0.0f;
-	collider.colorB = 0.0f;
-	collider.textureIndex = -1; // No texture
-
-	return collider;
-}
-
-//-------------------------------------------------------------------------------------------------------------
-
-// Coffee Collectible Placement Helper | MUST CHANGE
-void createcoffee(float x, float y)
-{
-	collectible[coffeeNum].x = x;
-	collectible[coffeeNum].y = y;
-	collectible[coffeeNum].sizeX = 0.3f;
-	collectible[coffeeNum].sizeY = 0.4f;
-
-	collectible[coffeeNum].isSolid = false;
-	collectible[coffeeNum].canSee = true;
-	collectible[coffeeNum].destroyed = false;
-
-	collectible[coffeeNum].textureIndex = 18;
-
-	coffeeNum++;
-}
-
-// Block Column/Row Placement Helper | MUST CHANGE
-void createColumn(char direction, float startX, float startY, int length, int rows, float tileSize, bool collider = true, int startTexIndex = 8, int endTexIndex = -1, bool invisible = false)
-{
-	if (!invisible)
-	{
-		int totalTiles = length * rows;
-		int textureRange = (endTexIndex - startTexIndex) + 1;
-		if (textureRange < 1) textureRange = 1;
-
-		int tileCounter = 0; // Increments each tile
-
-		// Loop over rows and columns
-		for (int r = 0; r < rows; r++)
-		{
-			for (int c = 0; c < length; c++)
-			{
-				float xPos, yPos;
-
-				// 'H' creates horizontal placement
-				if (direction == 'H' || direction == 'h')
-				{
-					xPos = startX + c * tileSize;
-					yPos = startY + r * tileSize;
-				}
-				// Using V for organization alone
-				else
-				{
-					xPos = startX + r * tileSize;
-					yPos = startY + c * tileSize;
-				}
-
-				// Tile Setup
-				int currentTexOffset = tileCounter % textureRange;
-				int currentTexIndex = startTexIndex + currentTexOffset;
-				// Apple Set Tiles
-				ground[groundNum] = CreateGround(xPos, yPos, tileSize, tileSize, false, currentTexIndex);
-				groundNum++;
-				tileCounter++;
-			}
-		}
-	}
-
-	// Large Collider Creation (Prevent Clipping)
-	if (collider)
-	{
-		float colliderWidth, colliderHeight;
-
-		if (direction == 'H' || direction == 'h')
-		{
-			colliderWidth = length * tileSize;
-			colliderHeight = rows * tileSize;
-		}
-		else
-		{
-			colliderWidth = rows * tileSize;
-			colliderHeight = length * tileSize;
-		}
-
-		ground[groundNum] = createInvisibleCollider(
-			startX,
-			startY,
-			colliderWidth,
-			colliderHeight
-		);
-		groundNum++;
-	}
-}
-
-// Hazard Object
-void createHazard(float x, float y, float tileWidth = 1.0f, float tileLength = 1.0f)
-{
-	hazard.x = x;
-	hazard.y = y;
-	hazard.sizeX = tileWidth;
-	hazard.sizeY = tileLength;
-	hazard.isSolid = false;
-	hazard.canSee = false;
-	hazard.destroyed = false;
-	hazard.textureIndex = -1;
-
-	// Debug Color (Red)
-	hazard.colorR = 1.0f;
-	hazard.colorG = 0.0f;
-	hazard.colorB = 0.0f;
-}
-
-// Map Exit  Function
-void createMapExit(float x, float y, float tileSize = 1.0f, bool visible = false)
-{
-	mapExit.x = x;
-	mapExit.y = y;
-	mapExit.sizeX = tileSize;
-	mapExit.sizeY = tileSize;
-	mapExit.isSolid = false;
-	mapExit.canSee = visible;
-	mapExit.destroyed = false;
-	mapExit.textureIndex = -1;
-
-	// Debug Color (Green)
-	mapExit.colorR = 0.0f;
-	mapExit.colorG = 1.0f;
-	mapExit.colorB = 0.0f;
-}
 
 // Sound Library Functions
 void playMenuMusic()
@@ -740,10 +885,6 @@ void init(void)
 	leftCheck.colorR = 0;
 	rightCheck.colorR = 0;
 	topCheck.colorR = 0;
-
-	// Win/Lose Objects
-	createHazard(-5.0f, -10.0f, 60.0f, 0.05f);    // Falling Gameover Failsafe
-	createMapExit(-4.5f, -1.0f, 1.0f);
 }
 
 void CreateMechanics()
@@ -849,40 +990,40 @@ void gravityCheck()
 	if (currentScene != GameScene) return;
 	onGround = false;
 
-	// If bottomCheck collides with any ground object: onGround=true
-	for (int i = 0; i < groundNum; ++i)
+	// Bottom Check – detect standing on ground
+	for (auto& ground : platforms)
 	{
-		if (ground[i].isSolid && CheckCollision(bottomCheck, ground[i]))
+		if (ground.isSolid && CheckCollision(bottomCheck, ground))
 		{
 			onGround = true;
 			break;
 		}
 	}
 
-	// If leftCheck collides: push the player right
-	for (int i = 0; i < groundNum; ++i)
+	// Left Check – push player right
+	for (auto& ground : platforms)
 	{
-		if (ground[i].isSolid && CheckCollision(leftCheck, ground[i]))
+		if (ground.isSolid && CheckCollision(leftCheck, ground))
 		{
 			player.x += speed;
 			break;
 		}
 	}
 
-	// If rightCheck collides: push the player left
-	for (int i = 0; i < groundNum; ++i)
+	// Right Check – push player left
+	for (auto& ground : platforms)
 	{
-		if (ground[i].isSolid && CheckCollision(rightCheck, ground[i]))
+		if (ground.isSolid && CheckCollision(rightCheck, ground))
 		{
 			player.x -= speed;
 			break;
 		}
 	}
 
-	// If topCheck collides (while jumping): Reset Jump Timer
-	for (int i = 0; i < groundNum; ++i)
+	// Top Check – stop jump if hitting ceiling
+	for (auto& ground : platforms)
 	{
-		if (ground[i].isSolid && CheckCollision(topCheck, ground[i]) && jump)
+		if (ground.isSolid && CheckCollision(topCheck, ground) && jump)
 		{
 			jump = false;
 			jumpTimer = resetJumpTimer;
@@ -890,22 +1031,18 @@ void gravityCheck()
 		}
 	}
 
-	// If not on ground: Apply Gravity
+	// If not on ground: apply gravity
 	if (!onGround)
 	{
-		// Apply gravity
 		player.y -= gravity;
 	}
 
-	if (currentScene != GameScene) return;
-
-	if (currentScene == GameScene && player.y < -10.0)
+	// Fall out of bounds
+	if (player.y < -10.0)
 	{
 		currentScene = LoseScene;
 		playLoseMusic();
 	}
-
-
 }
 
 //-------------------------------------------------------------------------------------------------------------
@@ -965,7 +1102,7 @@ void drawTextWithBG(string text, float x, float y, float width, float height, bo
 
 	// Draw the text background using the calculated center position
 	if (showBG) { // Turn background on or off
-		glColor3f(0.60f, 0.60f, 0.60f); // Light gray color for the background
+		glColor3f(/* Red */  44.5f / 255.0f, /* Green */ 30.5f / 255.0f, /* Blue */ 41.5f / 255.0f);
 		// You can add more to change the color
 		glBegin(GL_QUADS);
 		glVertex3f(centerX, centerY, 0);
@@ -982,7 +1119,7 @@ void drawTextWithBG(string text, float x, float y, float width, float height, bo
 	float textY = centerY + (height - 0.2) / 2;
 
 	// Draw the button text
-	glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
+	glColor3f(/* Red */  246.0f / 255.0f, /* Green */ 231.0f / 255.0f, /* Blue */ 254.0f / 255.0f); // Text Color
 	glRasterPos3f(textX, textY, 1);
 	for (int i = 0; i < text.length(); i++) {
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
@@ -1069,22 +1206,45 @@ void drawTopPanelBackground()
 	glMatrixMode(GL_PROJECTION); glLoadIdentity();
 	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
-	drawSquare(2.0f, 2.0f, 1.0f, 0.0f, 0.0f, 0.0f, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+	drawSquare(2.0f, 2.0f, 1.0f, 0.0f, 0.0f, 0.0f, /* Red */ 42.0f / 255.0f, /* Green */ 30.0f / 255.0f, /* Blue */ 40.0f / 255.0f);
 	glPopMatrix();
 
 }
 
+
 void drawTopPanelMessages()
 {
-	if (currentScene == EditScene)
+	if (displaySceneStateDisplay)
 	{
-		
-		glColor3f(0.0, 0.0, 0.0);
-		glRasterPos3f(0.05f, 0.0f, 0.0f);
-		const char* editLabel = "Edit Mode Active";
-		for (int i = 0; editLabel[i] != '\0'; ++i)
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, editLabel[i]);
-		
+		glPushMatrix();
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0.0f, 7.0, 0.0, 9.5, -1.0, 1.0);
+		glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+		switch (currentScene)
+		{
+		case EditScene:
+			drawTextWithBG("Scene: Edit", 13.5f, 3.9, 14.0f, 0.4f, false);
+			break;
+
+		case MenuScene:
+			drawTextWithBG("Scene: Menu", 13.5f, 3.9, 14.0f, 0.4f, false);
+			break;
+
+		case GameScene:
+			drawTextWithBG("Scene: Game", 13.5f, 3.9, 14.0f, 0.4f, false);
+			break;
+
+		case WinScene:
+			drawTextWithBG("Scene: Win", 13.5f, 3.9, 14.0f, 0.4f, false);
+			break;
+
+		case LoseScene:
+			drawTextWithBG("Scene: Lose", 13.5f, 3.9, 14.0f, 0.4f, false);
+			break;
+		}
+
+		glPopMatrix();
 	}
 }
 
@@ -1114,12 +1274,14 @@ void drawTopPanelButtons()
 void drawTopPanel() 
 {
 	drawTopPanelBackground();
-	//drawTopPanelMessages();
+	drawTopPanelMessages();
 
 }
 
-// Bottom Panel |  Source: Panel Example
-void drawBottomPanel() {
+
+
+void drawBottomPanelBackground()
+{
 	glPushMatrix();
 	glViewport(0, 0, WIN_W, BOTTOM_PANEL_H);
 	glMatrixMode(GL_PROJECTION);
@@ -1133,6 +1295,27 @@ void drawBottomPanel() {
 	for (auto& button : bottomPanelButtons) {
 		button.draw();
 	}
+}
+
+void drawBottomPanelTitle()
+{
+	glPushMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-7.0, 7.0, 5.0, 9.2, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	drawTextWithBG("                         Assets", -0.04f, 8.8, 14.0f, 0.8f, true);
+
+}
+
+
+// Bottom Panel |  Source: Panel Example
+void drawBottomPanel() 
+{
+	drawBottomPanelBackground();
+	drawBottomPanelTitle();
+
+
 }
 
 // Draw Complete Editor
@@ -1244,65 +1427,72 @@ void EditGame()
 
 void ActiveGame()
 {
-	// Before loading Global Values. Establish rules.
-
-	// Apply Player Movement Logic
+	// Player Movement
 	if (lt)
 		player.x -= speed;
 	if (rt)
 		player.x += speed;
 
-
-	// Apply Gravity + Collision
+	// Physics + Collision
 	gravityCheck();
 
-	if (currentScene == GameScene && CheckCollision(player, hazard))
+	// Check collision with hazards (dynamic list)
+	for (auto& hz : hazards)
 	{
-		currentScene = LoseScene;
-		playLoseMusic();
+		if (CheckCollision(player, hz))
+		{
+			currentScene = LoseScene;
+			playLoseMusic();
+			break;
+		}
 	}
 
-	if (currentScene == GameScene && CheckCollision(player, mapExit) && coffeeCollected >= totalcoffee)
+	// Check win condition (touching exit & all coffee collected)
+	for (auto& Ex : exits)
 	{
-		currentScene = WinScene;
-		playWinMusic();
+		if(CheckCollision(player, Ex) && coffeeCollected >= totalcoffee)
+		{
+			currentScene = WinScene;
+			playWinMusic();
+		}
 	}
 }
 
 
 void editorVisualized()
 {
-
-	// Render World (Background, Props, Special Props, Player): Essential
-
 	// Background/Environment/Props
-	for (int i = 0; i < groundNum; ++i)		
+	for (auto& ground : platforms)
 	{
-		if (!ground[i].isSolid)
-		{
-			ground[i].DrawGameObject(true);
-		}
-			
+		if (!ground.isSolid)
+			ground.DrawGameObject(true);
 	}
 
-	// Special Props
-	for (int i = 0; i < coffeeNum; ++i)
+	// Special Props - Collectibles
+	for (auto& coffee : collectibles)
 	{
-		if (!collectible[i].destroyed)
+		if (!coffee.destroyed)
 		{
-			collectible[i].DrawGameObject(true);
-			if (CheckCollision(player, collectible[i]))
+			coffee.DrawGameObject(true);
+			if (CheckCollision(player, coffee))
 			{
-				collectible[i].destroyed = true;
+				coffee.destroyed = true;
 				++coffeeCollected;
 			}
 		}
 	}
 
-	// Place Exit and Hazards
-	hazard.DrawGameObject(true);
-	mapExit.DrawGameObject(false);
+	// Hazards
+	for (auto& hz : hazards)
+	{
+		hz.DrawGameObject(true);
+	}
 
+	// Exits
+	for (auto& ex : exits)
+	{
+		ex.DrawGameObject(false); // Green Box
+	}
 
 	// Player
 	CreatePlayer(showCollision);
@@ -1313,55 +1503,71 @@ void editorVisualized()
 }
 
 
-void GlobalValues() // MUST EDIT
+
+void GlobalValues()
 {
-	// Viewport Edit Camera 
-	// Playmode Camera (Maybe Just make a camera Logic Function) 
-	//(playmode)
+	// Game Camera
+	if (currentScene == GameScene)
+		gameCameraLogic();
 
-	// Basic Logic for Game Camera
-	if (currentScene == GameScene) gameCameraLogic();
-
-	// Camera Follow
 	gluLookAt(cameraX, cameraY, 5, cameraX, cameraY, 0, 0, 1, 0);
 
 	// ------------------------------------------------------------------------
+	// Render World
 
-	// Render World (Background, Props, Special Props, Player): Essential
+	// Background / Platforms
+	for (auto& platform : platforms)
+	{
+		if (!platform.isSolid)
+			platform.DrawGameObject(true);
+	}
 
-	// Background/Environment/Props
-	for (int i = 0; i < groundNum; ++i)
-		if (!ground[i].isSolid)
-			ground[i].DrawGameObject(true);
-
-	// Special Props
-	for (int i = 0; i < coffeeNum; ++i)
-		if (!collectible[i].destroyed)
+	// Collectibles
+	for (auto& coffee : collectibles)
+	{
+		if (!coffee.destroyed)
 		{
-			collectible[i].DrawGameObject(true);
-			if (CheckCollision(player, collectible[i]))
+			coffee.DrawGameObject(true);
+			if (CheckCollision(player, coffee))
 			{
-				collectible[i].destroyed = true;
+				coffee.destroyed = true;
 				++coffeeCollected;
 			}
 		}
+	}
 
-	// Place Exit and Hazards
-	hazard.DrawGameObject(false);
-	mapExit.DrawGameObject(false);
+	// Hazards
+	for (auto& hz : hazards)
+	{
+		hz.DrawGameObject(false);
+		if (CheckCollision(player, hz))
+		{
+			currentScene = LoseScene;
+			playLoseMusic();
+		}
+	}
 
+	// Exit Tiles (Win)
+	for (auto& ex : exits)
+	{
+		ex.DrawGameObject(false);
+		if (CheckCollision(player, ex) && coffeeCollected >= totalcoffee)
+		{
+			currentScene = WinScene;
+			playWinMusic();
+		}
+	}
 
 	// Player
 	CreatePlayer(showCollision);
 
-	// Enable Rules:
-	// Timer Hud Above All
+	// UI
 	CreateMechanics();
 
 	// Debug
 	if (axis) drawAxis();
-
 }
+
 
 void EditorScene()
 {
@@ -1524,6 +1730,71 @@ void Keyboard(unsigned char key, int x, int y)
 			gridMode = !gridMode;
 
 		break;
+	}
+
+	glutPostRedisplay();
+}
+
+void MouseControl(int button, int state, int x, int y) {
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		// Initialize world coordinates and clicked panel
+		float worldX, worldY;
+		string clickedPanel;
+
+		// Determine which viewport was clicked
+		if (x >= 0 && x < SIDE_PANEL_W) {
+			// Left panel clicked
+			clickedPanel = "Left Panel";
+		}
+		else if (x >= SIDE_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W) {
+			// Main panel clicked
+			clickedPanel = "Main Panel";
+		}
+		else if (x >= SIDE_PANEL_W + MAIN_PANEL_W && x < SIDE_PANEL_W + MAIN_PANEL_W * 2) {
+			// Right panel clicked
+			clickedPanel = "Right Panel";
+		}
+		else {
+			// Main panel clicked
+			clickedPanel = "Main Panel";
+		}
+
+		if (y >= WIN_H - BOTTOM_PANEL_H) {
+			// Bottom panel clicked
+			clickedPanel = "Bottom Panel";
+		}
+		else if (y < TOP_PANEL_H) {
+			// Top panel clicked
+			clickedPanel = "Top Panel";
+		}
+
+		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
+
+		// Check if any button was clicked
+		for (auto& button : leftPanelButtons) {
+			if (button.isInside(x, y)) {
+				button.handleClick(); // Trigger the action associated with the button
+				break; // Exit the loop after handling the click for one button
+			}
+		}
+
+		for (auto& button : bottomPanelButtons) {
+			if (button.isInside(x, y)) {
+				button.handleClick(); // Trigger the action associated with the button
+				break; // Exit the loop after handling the click for one button
+			}
+		}
+	}
+
+	// Check if clicked in or out of text box to set as active or not.
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		if (textInput.isInside(x, y)) {
+			textInput.setActive(true);
+		}
+
+		else {
+			textInput.setActive(false);
+		}
 	}
 
 	glutPostRedisplay();
@@ -1722,6 +1993,7 @@ int main(int argc, char** argv)
 	glutKeyboardFunc(Keyboard);
 	glutSpecialFunc(specialKeyboard);
 	glutSpecialUpFunc(specialKeyboardRelease);
+	glutMouseFunc(MouseControl);
 
 	// Print controls to terminal
 	std::cout << std::endl;
