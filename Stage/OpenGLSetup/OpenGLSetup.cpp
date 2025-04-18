@@ -73,6 +73,7 @@ bool lt, rt, jump, contact, onGround;
 
 // Toggles
 bool axis;
+bool buttonDebug = true;
 
 // Mechanic Values
 int totalcoffee = 10;					// Collectibles (Total)
@@ -410,21 +411,25 @@ public:
 	}
 
 	void draw() {
-		// Draw the text input box background
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the text input box
+		// convert from pixel window coordinates to normalized ortho coordinates
+		float orthoX = (windowX / (float)SIDE_PANEL_W) * 2.0f - 1.0f;
+		float orthoY = (windowY - BOTTOM_PANEL_H) / (float)MAIN_PANEL_H * 9.5f;
+
+		float centerX = orthoX - width / 2.0f;
+		float centerY = orthoY - height / 2.0f;
+
+		glColor3f(0.9f, 0.9f, 0.9f);
 		glBegin(GL_QUADS);
-		glVertex2f(x, y);
-		glVertex2f(x + width, y);
-		glVertex2f(x + width, y + height);
-		glVertex2f(x, y + height);
+		glVertex3f(centerX, centerY, 0);
+		glVertex3f(centerX + width, centerY, 0);
+		glVertex3f(centerX + width, centerY + height, 0);
+		glVertex3f(centerX, centerY + height, 0);
 		glEnd();
 
-		// Draw the text inside the text input box
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos2f(x + 0.05f, y + (height / 2) - 0.05f); // Adjust position for centering
-		for (char c : text) {
+		glColor3f(0.0f, 0.0f, 0.0f);
+		glRasterPos3f(centerX + 0.1f, centerY + (height - 0.2f) / 2, 1);
+		for (char c : text)
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
-		}
 	}
 };
 
@@ -432,11 +437,12 @@ public:
 
 //------------------------------------------------------------------------------------------------------------
 // Button class
-class Button {
-public:
-	float x, y; // Position of the button in the viewport
-	float width, height; // Dimensions of the button in the viewport
-	float windowX, windowY; // Position of the button in the window
+class Button 
+{
+	public:
+		float x, y; // Position of the button in the viewport
+		float width, height; // Dimensions of the button in the viewport
+		float windowX, windowY; // Position of the button in the window
 	float windowWidth, windowHeight; // Dimensions of the button in the window
 	string text; // Text to be displayed on the button
 	bool clicked; // Indicates whether the button has been clicked
@@ -449,12 +455,22 @@ public:
 	// x, y, w, h, windowX, windowY, windowWidth, windowHeight, text, buttonAction, gameObject pointer
 	// Updated to allow for the passing of a gameObject reference but is not necessary
 	Button(float posX, float posY, float w, float h,
-		float winX, float winY, float winW, float winH,
-		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
+		float winX = 0, float winY = 0, float winW = 200, float winH = 20,
+		function<void(Button&)> act = nullptr, const string& txt = "", GameObject* obj = nullptr)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false) {
+		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false)
+	{
 	}
+
+	Button(float posX, float posY, float w, float h,
+		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
+		: Button(posX, posY, w, h,
+			SIDE_PANEL_W / 2,									// WindowX: center of left panel
+			BOTTOM_PANEL_H + (MIDDLE_PANEL_H * ((9.5f - posY) / 9.5f)), // WindowY from logic
+			200, 20, act, txt, obj) {
+	}
+
 
 	bool isInside(int mouseX, int mouseY) {
 		// Calculate the boundaries of the button
@@ -596,32 +612,131 @@ TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
 // assiging them when the button is made.
 void hierarchyButton(Button& button) {
 	if (button.gameObject != nullptr) {
-		// Update textInput with gameObject's x-coordinate
 		textInput.text = to_string(button.gameObject->x);
 		textInput.gameObject = button.gameObject;
+
+		cout << "Inspecting " << button.text
+			<< " at X = " << button.gameObject->x
+			<< ", Y = " << button.gameObject->y << endl;
 	}
 	else {
 		cout << "Button's gameObject is null" << endl;
 	}
-
-	cout << "Completed button action" << endl;
 }
 
-// Adds a ground asset to the game
-void buttonAddGround(Button& button) {
-	// Define actions for buttons
-	GameObject ground;
-	ground.colorG = 0;
-	platforms.emplace_back(ground);
+void assetSpawnGround(Button& button) {
+	GameObject newGround = CreateGround(0, 0, 1, 1, true, true, 54);
+	platforms.push_back(newGround);
 
-	// Top left corner is (0, 0), so if you want to make a list of 
-	// buttons that you can just add, you'll need to add to the 
-	// windowY rather than subtract to go down the window.
-	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
-		100, leftPanelButtons.back().windowY + 30, 200, 20,
-		hierarchyButton, "Ground " + to_string(leftPanelButtons.size()), &platforms.back());
+	// Desired starting window Y position
+	const float desiredFirstWindowY = 130.0f;
 
-	printf("Completed action add ground \n");
+	// Convert windowY to logicalY
+	auto reverseCalculateLogicalY = [](float windowY) -> float {
+		float ratio = (windowY - BOTTOM_PANEL_H) / MIDDLE_PANEL_H;
+		return 9.5f - (ratio * 9.5f);
+		};
+
+	float newLogicalY = leftPanelButtons.empty()
+		? reverseCalculateLogicalY(desiredFirstWindowY)
+		: leftPanelButtons.back().y - 0.7f;
+
+	float newWindowY = leftPanelButtons.empty()
+		? desiredFirstWindowY
+		: leftPanelButtons.back().windowY + 25.0f;
+
+	Button groundBtn(
+		0.0f, newLogicalY,       // Logical Pos
+		14.0f, 0.6f,             // Logical Size
+		125.0f, newWindowY,      // Window Position
+		200.0f, 20.0f,           // Window Size
+		hierarchyButton,
+		"Ground " + to_string(groundNum),
+		&platforms.back()
+	);
+
+	leftPanelButtons.push_back(groundBtn);
+
+	if (buttonDebug) {
+		cout << "Spawned Ground " << groundNum << " at (X = " << newGround.x << ", Y = " << newGround.y << ")" << endl;
+		cout << "Button Info -> Label: " << groundBtn.text << endl;
+		cout << "  Logical Pos: X = " << groundBtn.x << ", Y = " << groundBtn.y << endl;
+		cout << "  Window Pos : X = " << groundBtn.windowX << ", Y = " << groundBtn.windowY << endl;
+		cout << "----------------------------------------------" << endl;
+	}
+
+	groundNum++;
+}
+
+
+void assetSpawnCollectible(Button& button) {
+	GameObject newCoffee = CreateCollectible(0, 0);
+	collectibles.push_back(newCoffee);
+
+	Button coffeeBtn(0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		hierarchyButton, "Collectible " + to_string(coffeeNum), &collectibles.back());
+
+	leftPanelButtons.push_back(coffeeBtn);
+	coffeeNum++;
+
+	cout << "Spawned Collectible " << coffeeNum - 1 << " at X = " << newCoffee.x << endl;
+}
+
+
+void assetSpawnHazard(Button& button) {
+	GameObject newHazard = CreateHazard(0, 0, 1, 1, true, true);
+	hazards.push_back(newHazard);
+
+	Button hazardBtn(0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		hierarchyButton, "Hazard", &hazards.back());
+
+	leftPanelButtons.push_back(hazardBtn);
+
+	cout << "Spawned Hazard at X = " << newHazard.x << endl;
+}
+
+
+void assetSpawnExit(Button& button) 
+{
+	GameObject newExit = CreateExit(0, 0, 1, 1, true, true);
+	exits.push_back(newExit);
+
+	Button exitBtn(0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		hierarchyButton, "Exit", &exits.back());
+
+	leftPanelButtons.push_back(exitBtn);
+
+	cout << "Spawned Exit at X = " << newExit.x << endl;
+}
+
+
+void inspectorToggleVisibility(Button& button) 
+{
+	if (button.gameObject != nullptr) 
+	{
+		button.gameObject->canSee = !button.gameObject->canSee;
+		cout << button.text << " visibility toggled." << endl;
+	}
+}
+
+void inspectorEditX(Button& button) 
+{
+	if (button.gameObject != nullptr) 
+	{
+		textInput.text = to_string(button.gameObject->x);
+		textInput.gameObject = button.gameObject;
+		cout << "Editing X of " << button.text << endl;
+	}
+}
+
+void inspectorEditY(Button& button) 
+{
+	if (button.gameObject != nullptr) 
+	{
+		textInput.text = to_string(button.gameObject->y);
+		textInput.gameObject = button.gameObject;
+		cout << "Editing Y of " << button.text << endl;
+	}
 }
 
 
@@ -663,7 +778,7 @@ void buttonDrawGrid()
 
 void buttonAddPlatform(Button& button)
 {
-	platforms.emplace_back(CreateGround(0.0f, 0.0f, 1.0f, 1.0f, true, 54));
+	platforms.emplace_back(CreateGround(0.0f, 0.0f, 1.0f, 1.0f, true, true, 54));
 	printf("Platform added\n");
 }
 
@@ -860,6 +975,20 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	return collisionX && collisionY;
 }
 
+
+
+
+// Perfect Placement
+
+float logicalToWindowY(float logicalY) {
+	return BOTTOM_PANEL_H + (MIDDLE_PANEL_H * (logicalY / 9.5f));
+}
+
+// Converts logical OpenGL X to window X (for mouse click detection)
+float logicalToWindowX(float logicalX) {
+	return SIDE_PANEL_W * (logicalX / 7.0f); // assuming logicalX ranges from -7 to 7 (like glOrtho -7 to 7)
+}
+
 //-------------------------------------------------------------------------------------------------------------
 
 // Environment Initialization
@@ -887,16 +1016,36 @@ void init(void)
 	topCheck.colorR = 0;
 
 
-	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
-	// Add buttons to list
-	leftPanelButtons.push_back(button1);
+	// Button Creation
+
+	// Create Inspector Buttons		(Right)
+	Button inspectorButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Inspector", &player);
+
+	// Create Hierarchy Buttons		(Left)
+	Button playerButton(0, 8.0, 14, 0.5, assetSpawnGround, "Player", &player);
+
+	
+	// Create Asset Buttons			(Bottom)
+	Button groundButton(0, 8.0, 14, 0.5, assetSpawnGround, "Ground", &player);
+
+	// Create Modification Buttons	(Top)
+	Button editButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
+	
 
 
-	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
-	// Add buttons to list
-	rightPanelButtons.push_back(button1);
+	// Button Placement
+
+	// Inspector Buttons	(Right)
+	rightPanelButtons.push_back(inspectorButton);
+
+	// Hierarchy Buttons	(Left)
+	leftPanelButtons.push_back(playerButton);
+
+	// Asset Buttons		(Bottom)
+	bottomPanelButtons.push_back(groundButton);
+
+	// Modification Buttons (Top)
+	topPanelButtons.push_back(editButton);
 
 
 
@@ -912,7 +1061,7 @@ void init(void)
 		200,	// Window Width
 		20,		// Window Height
 
-		buttonAddGround,	// Function
+		assetSpawnGround,	// Function
 		"Ground"			// Title
 	);
 
@@ -1217,16 +1366,26 @@ void drawRightPanelInspectorTitle()
 	glOrtho(-7.0, 7.0, 0.0, 9.5, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
 	drawTextWithBG("                         Inspector", 0.0f, 9.3, 14.0f, 0.4f, true);
+	glPopMatrix();
+}
 
-	for (auto& button : rightPanelButtons) {
-		button.draw();
-	}
+void drawRightPanelButtons()
+{
 	glPushMatrix();
+	if (selectedObject != nullptr || buttonDebug == true)
+	{
+		for (auto& button : rightPanelButtons)
+		{
+			button.draw();
+		}
+	}
+	glPopMatrix();
 }
 
 void drawRightPanel() {
 	drawRightPanelBackground();
 	drawRightPanelInspectorTitle();
+	drawRightPanelButtons();
 }
 
 // Top Panel
@@ -1806,10 +1965,15 @@ void MouseControl(int button, int state, int x, int y) {
 
 		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 
+
 		// Check if any button was clicked
+		// --------------------------------------------------------------------
+
 		for (auto& button : leftPanelButtons) {
 			if (button.isInside(x, y)) {
 				button.handleClick(); // Trigger the action associated with the button
+				clickedPanel = "Left Button";
+				cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 				break; // Exit the loop after handling the click for one button
 			}
 		}
@@ -1818,6 +1982,13 @@ void MouseControl(int button, int state, int x, int y) {
 			if (button.isInside(x, y)) {
 				button.handleClick(); // Trigger the action associated with the button
 				break; // Exit the loop after handling the click for one button
+			}
+		}
+
+		for (auto& button : rightPanelButtons) {
+			if (button.isInside(x, y)) {
+				button.handleClick(); // THIS must run
+				break;
 			}
 		}
 	}
