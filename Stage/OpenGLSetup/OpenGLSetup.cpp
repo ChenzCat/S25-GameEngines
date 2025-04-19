@@ -46,6 +46,17 @@ bool displaySceneStateDisplay = true;
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
 
+
+enum PanelType
+{
+	LEFT_PANEL,
+	RIGHT_PANEL,
+	TOP_PANEL,
+	BOTTOM_PANEL,
+	UNKNOWN_PANEL
+};
+
+
 //
 
 
@@ -411,25 +422,38 @@ public:
 	}
 
 	void draw() {
-		// convert from pixel window coordinates to normalized ortho coordinates
-		float orthoX = (windowX / (float)SIDE_PANEL_W) * 2.0f - 1.0f;
-		float orthoY = (windowY - BOTTOM_PANEL_H) / (float)MAIN_PANEL_H * 9.5f;
+		glPushMatrix();
 
-		float centerX = orthoX - width / 2.0f;
-		float centerY = orthoY - height / 2.0f;
+		// Set up orthographic projection that maps [0, SIDE_PANEL_W] x [0, MAIN_PANEL_H] to [-1, 1] x [0, 9.5]
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0.0, SIDE_PANEL_W, 0.0, WIN_H, -1.0, 1.0);
 
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		// Compute corners directly in pixel space
+		float left = windowX - windowWidth / 2;
+		float right = windowX + windowWidth / 2;
+		float bottom = windowY - windowHeight / 2;
+		float top = windowY + windowHeight / 2;
+
+		// Background
 		glColor3f(0.9f, 0.9f, 0.9f);
 		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
+		glVertex3f(left, bottom, 0);
+		glVertex3f(right, bottom, 0);
+		glVertex3f(right, top, 0);
+		glVertex3f(left, top, 0);
 		glEnd();
 
+		// Draw text inside button
 		glColor3f(0.0f, 0.0f, 0.0f);
-		glRasterPos3f(centerX + 0.1f, centerY + (height - 0.2f) / 2, 1);
+		glRasterPos3f(left + 5.0f, bottom + (windowHeight / 2.5f), 0);
 		for (char c : text)
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
+
+		glPopMatrix();
 	}
 };
 
@@ -451,25 +475,15 @@ class Button
 	GameObject* gameObject; // Used to get and set the variables of the game object
 	int textureNum; // Texture number
 	bool sprite; // If there is a sprite or not
+	PanelType panel = UNKNOWN_PANEL;
 
 	// x, y, w, h, windowX, windowY, windowWidth, windowHeight, text, buttonAction, gameObject pointer
 	// Updated to allow for the passing of a gameObject reference but is not necessary
-	Button(float posX, float posY, float w, float h,
-		float winX = 0, float winY = 0, float winW = 200, float winH = 20,
-		function<void(Button&)> act = nullptr, const string& txt = "", GameObject* obj = nullptr)
-		: x(posX), y(posY), width(w), height(h),
-		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false)
-	{
-	}
+	Button(float posX, float posY, float w, float h, float winX = 0, float winY = 0, float winW = 200, float winH = 20, function<void(Button&)> act = nullptr, const string& txt = "", GameObject* obj = nullptr, PanelType panelContext = UNKNOWN_PANEL)
+		: x(posX), y(posY), width(w), height(h),windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false), panel(panelContext) {}
 
-	Button(float posX, float posY, float w, float h,
-		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
-		: Button(posX, posY, w, h,
-			SIDE_PANEL_W / 2,									// WindowX: center of left panel
-			BOTTOM_PANEL_H + (MIDDLE_PANEL_H * ((9.5f - posY) / 9.5f)), // WindowY from logic
-			200, 20, act, txt, obj) {
-	}
+	Button(float posX, float posY, float w, float h, function<void(Button&)> act, const string& txt, GameObject* obj = nullptr, PanelType panelContext = UNKNOWN_PANEL): 
+		Button(posX, posY, w, h, SIDE_PANEL_W / 2, BOTTOM_PANEL_H + (MIDDLE_PANEL_H * ((9.5f - posY) / 9.5f)), 200, 20, act, txt, obj, panelContext) {}
 
 
 	bool isInside(int mouseX, int mouseY) {
@@ -496,34 +510,60 @@ class Button
 		}
 	}
 
-	// Method to draw the button
 	void draw() {
-		// Calculate the position to center the button
-		float centerX = x - width / 2;
-		float centerY = y - height / 2;
+		glPushMatrix();
 
-		// Draw the button background using the calculated center position
-		glColor3f(0.9f, 0.9f, 0.9f); // Light gray color for the button
+		// Set viewport based on panel
+		switch (panel) {
+		case LEFT_PANEL:
+			glViewport(0, BOTTOM_PANEL_H, SIDE_PANEL_W, MAIN_PANEL_H);
+			break;
+		case RIGHT_PANEL:
+			glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MAIN_PANEL_H);
+			break;
+		case TOP_PANEL:
+			glViewport(0, WIN_H - TOP_PANEL_H, WIN_W, TOP_PANEL_H);
+			break;
+		case BOTTOM_PANEL:
+			glViewport(0, 0, WIN_W, BOTTOM_PANEL_H);
+			break;
+		default:
+			glViewport(0, 0, WIN_W, WIN_H);
+			break;
+		}
+
+		// Projection in pixels
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0, WIN_W, 0, WIN_H, -1, 1);
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		// Calculate pixel coordinates for button quad
+		float left = windowX - windowWidth / 2.0f;
+		float right = windowX + windowWidth / 2.0f;
+		float bottom = windowY - windowHeight / 2.0f;
+		float top = windowY + windowHeight / 2.0f;
+
+		// Draw button background
+		glColor3f(0.9f, 0.9f, 0.9f);
 		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
+		glVertex2f(left, bottom);
+		glVertex2f(right, bottom);
+		glVertex2f(right, top);
+		glVertex2f(left, top);
 		glEnd();
 
-		// Adjust horizontal position to center the text horizontally within the button
-		float textX = centerX + 0.1;
+		// Draw button text
+		glColor3f(0.0f, 0.0f, 0.0f);
+		glRasterPos2f(left + 5.0f, bottom + (windowHeight / 2.5f));
+		for (char c : text)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
 
-		// Adjust vertical position to center the text vertically within the button
-		float textY = centerY + (height - 0.2) / 2;
-
-		// Draw the button text
-		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
-		glRasterPos3f(textX, textY, 1);
-		for (int i = 0; i < text.length(); i++) {
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, text[i]);
-		}
+		glPopMatrix();
 	}
+
 
 	void drawAssetButton() {
 		// Calculate the position to center the button
@@ -646,13 +686,14 @@ void assetSpawnGround(Button& button) {
 		: leftPanelButtons.back().windowY + 25.0f;
 
 	Button groundBtn(
-		0.0f, newLogicalY,       // Logical Pos
-		14.0f, 0.6f,             // Logical Size
-		125.0f, newWindowY,      // Window Position
-		200.0f, 20.0f,           // Window Size
-		hierarchyButton,
+		0, 0,         // ignored now
+		0, 0,         // ignored now
+		125, 160,     // windowX, windowY (pixels)
+		200, 20,      // windowWidth, windowHeight (pixels)
+		assetSpawnGround,
 		"Ground " + to_string(groundNum),
-		&platforms.back()
+		&platforms.back(),
+		LEFT_PANEL
 	);
 
 	leftPanelButtons.push_back(groundBtn);
@@ -1019,17 +1060,17 @@ void init(void)
 	// Button Creation
 
 	// Create Inspector Buttons		(Right)
-	Button inspectorButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Inspector", &player);
+	Button inspectorButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Inspector", &player, RIGHT_PANEL);
 
 	// Create Hierarchy Buttons		(Left)
-	Button playerButton(0, 8.0, 14, 0.5, assetSpawnGround, "Player", &player);
+	Button playerButton(0, 8.0, 14, 0.5, assetSpawnGround, "Player", &player, LEFT_PANEL);
 
 	
 	// Create Asset Buttons			(Bottom)
-	Button groundButton(0, 8.0, 14, 0.5, assetSpawnGround, "Ground", &player);
+	Button groundButton(0, 8.0, 14, 0.5, assetSpawnGround, "Ground", &player, BOTTOM_PANEL);
 
 	// Create Modification Buttons	(Top)
-	Button editButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player);
+	Button editButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &player, TOP_PANEL);
 	
 
 
@@ -1803,6 +1844,9 @@ void MyDisplay()
 	drawViewport();
 	drawEditor();
 	glutSwapBuffers();
+	for (const auto& btn : leftPanelButtons) {
+		std::cout << "Left Button " << btn.text << " Y = " << btn.windowY << "\n";
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------------
