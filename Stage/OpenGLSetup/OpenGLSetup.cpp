@@ -311,6 +311,15 @@ std::list<GameObject> exits;
 // Text Input Class
 class TextInput {
 public:
+
+	enum Field {
+		X,
+		Y,
+		Z,
+		X_SCALE,
+		Y_SCALE
+	} field;
+
 	float x, y; // Position of the text input box in the viewport
 	float width, height; // Dimensions of the text input box in the viewport
 	float windowX, windowY; // Position of the button in the window
@@ -321,11 +330,11 @@ public:
 
 	TextInput(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
-		const string& txt)
+		const string& txt, Field f)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), active(false), gameObject(nullptr) {
-	}
+		text(txt), active(false), gameObject(nullptr), field(f)
+	{}
 
 	void setActive(bool isActive) {
 		active = isActive;
@@ -348,8 +357,13 @@ public:
 				text += key;
 			}
 			if (gameObject != nullptr)
-				// Update the x value whenever a valid character is entered
-				gameObject->x = textToFloat();
+				switch (field) {
+				case X:       gameObject->x = textToFloat(); break;
+				case Y:       gameObject->y = textToFloat(); break;
+				case Z:       gameObject->z = textToFloat(); break;
+				case X_SCALE: gameObject->sizeX = textToFloat(); break;
+				case Y_SCALE: gameObject->sizeY = textToFloat(); break;
+				}
 		}
 	}
 
@@ -542,23 +556,51 @@ public:
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
 list<Button> leftPanelButtons, bottomPanelButtons;
 
-// Text input variable
-TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
+
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Create a list of buttons for the Right Panel
+
+// Text input box button X
+TextInput textInputX(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "", TextInput::X);
+
+// Text input box button Y
+TextInput textInputY(-5.8, 4.6, 4.5, 0.4, 850, 145, 66, 14, "", TextInput::Y);
+
+// Text input box button Z
+TextInput textInputZ(-5.8f, 3.8f, 4.5f, 0.4f, 850, 179, 66, 14, "", TextInput::Z);
+
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
 void hierarchyButton(Button& button) {
-	if (button.gameObject != nullptr) {
-		// Update textInput with gameObject's x-coordinate
-		textInput.text = to_string(button.gameObject->x);
-		textInput.gameObject = button.gameObject;
+	GameObject* o = button.gameObject;
+	if (o != nullptr) {
+		// Populate X field
+		textInputX.text = to_string(o->x);
+		textInputX.gameObject = o;
+		cout << "hierarchyButton: loaded X = " << o->x << endl;
+
+		// Populate Y field
+		textInputY.text = to_string(o->y);
+		textInputY.gameObject = o;
+		cout << "hierarchyButton: loaded Y = " << o->y << endl;
+
+		// Populate Z field
+		textInputZ.text = to_string(o->z);
+		textInputZ.gameObject = o;
+		cout << "hierarchyButton: loaded Y = " << o->z << endl;
 	}
 	else {
-		cout << "Button's gameObject is null" << endl;
+		cout << "hierarchyButton: Button's gameObject is null" << endl;
 	}
 
-	cout << "Completed button action" << endl;
+	cout << "hierarchyButton: Completed button action" << endl;
 }
+
+
+
+
+
 
 // Adds a ground asset to the game
 void buttonAddGround(Button& button) {
@@ -1168,7 +1210,7 @@ void drawRightPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
 
-	// Green background
+	// Background
 	drawSquare(15, 14, 1, 0, 0, 0, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 
 	// Draw text box to label panel
@@ -1176,11 +1218,19 @@ void drawRightPanel() {
 		0, 6.6, 14, 0.8, true);
 
 	// Draw text box for x coordinate label
-	drawTextWithBG("X:",
-		-4, 5.6, 6, 0.5, true);
+	drawTextWithBG("X:", -4, 5.6, 6, 0.5, true);
 
 	// Draw the text box
-	textInput.draw();
+	textInputX.draw();
+
+
+	drawTextWithBG("Y:", -4, 4.8f, 6, 0.5f, true);
+
+	// Draw the text box
+	textInputY.draw();
+
+	drawTextWithBG("Z:", -4, 4.0f, 6, 0.5f, true);
+	textInputZ.draw();
 
 	glPopMatrix();
 }
@@ -1276,6 +1326,11 @@ void specialKeyboardRelease(int key, int x, int y)
 
 void Keyboard(unsigned char key, int x, int y)
 {
+	// Text Box Input | Source: 
+	textInputX.handleKeyPress(key);
+	textInputY.handleKeyPress(key);
+	textInputZ.handleKeyPress(key);
+
 	switch (key)
 	{
 	case 'a': // Axis Toggle 
@@ -1383,15 +1438,28 @@ void MouseControl(int button, int state, int x, int y) {
 			}
 		}
 	}
+	int invertedY = WIN_H - y;
 
 	// Check if clicked in or out of text box to set as active or not.
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		if (textInput.isInside(x, y)) {
-			textInput.setActive(true);
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) 
+	{
+		if (textInputX.isInside(x, y)) {
+			textInputX.setActive(true);
+			textInputY.setActive(false);
 		}
-
+		else if (textInputY.isInside(x, y)) {
+			textInputY.setActive(true);
+			textInputX.setActive(false);
+		}
+		else if (textInputZ.isInside(x, y)) {
+			textInputX.setActive(false);
+			textInputY.setActive(false);
+			textInputZ.setActive(true);
+		}
 		else {
-			textInput.setActive(false);
+			textInputX.setActive(false);
+			textInputY.setActive(false);
+			textInputZ.setActive(false);
 		}
 	}
 
@@ -1628,7 +1696,7 @@ GameObject::GameObject()
 	colorR = colorG = colorB = 1;
 	mass = 0;
 	canSee = true;
-	isSolid = false;
+	isSolid = true;
 	destroyed = false;
 	gravity = false;
 	textureIndex = 0;
