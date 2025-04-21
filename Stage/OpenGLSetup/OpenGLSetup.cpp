@@ -317,7 +317,8 @@ public:
 		Y,
 		Z,
 		X_SCALE,
-		Y_SCALE
+		Y_SCALE,
+		TEXTURE
 	} field;
 
 	float x, y; // Position of the text input box in the viewport
@@ -363,6 +364,7 @@ public:
 				case Z:       gameObject->z = textToFloat(); break;
 				case X_SCALE: gameObject->sizeX = textToFloat(); break;
 				case Y_SCALE: gameObject->sizeY = textToFloat(); break;
+				case TEXTURE: gameObject->textureIndex = static_cast<int>(textToFloat()); break;
 				}
 		}
 	}
@@ -569,6 +571,18 @@ TextInput textInputY(-5.8, 4.6, 4.5, 0.4, 850, 145, 66, 14, "", TextInput::Y);
 // Text input box button Z
 TextInput textInputZ(-5.8f, 3.8f, 4.5f, 0.4f, 850, 179, 66, 14, "", TextInput::Z);
 
+// Text input box button X Scale
+TextInput textInputXScale(-5.8f, 3.0f, 4.5f, 0.4f, 850, 213, 66, 14, "", TextInput::X_SCALE);
+
+// Text input box button Y Scale
+TextInput textInputYScale(-5.8f, 2.2f, 4.5f, 0.4f, 850, 247, 66, 14, "", TextInput::Y_SCALE);
+
+// Text input box button Texture
+TextInput textInputTexture(-5.8f, 1.4f, 4.5f, 0.4f, 850, 281, 66, 14, "", TextInput::TEXTURE);
+
+
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Give buttons functions by making functions and 
 // assiging them when the button is made.
@@ -589,6 +603,22 @@ void hierarchyButton(Button& button) {
 		textInputZ.text = to_string(o->z);
 		textInputZ.gameObject = o;
 		cout << "hierarchyButton: loaded Y = " << o->z << endl;
+
+		// Populate X Scale field
+		textInputXScale.text = to_string(o->sizeX);
+		textInputXScale.gameObject = o;
+		cout << "hierarchyButton: loaded X Scale = " << o->sizeX << endl;
+
+		// Populate Y Scale field
+		textInputYScale.text = to_string(o->sizeY);
+		textInputYScale.gameObject = o;
+		cout << "hierarchyButton: loaded Y Scale = " << o->sizeY << endl;
+
+		// Populate Texture field
+		textInputTexture.text = to_string(o->textureIndex);
+		textInputTexture.gameObject = o;
+		cout << "hierarchyButton: loaded Texture = " << o->textureIndex << endl;
+
 	}
 	else {
 		cout << "hierarchyButton: Button's gameObject is null" << endl;
@@ -651,6 +681,7 @@ void init(void) {
 	ground.sizeX = 10.0f;
 	ground.sizeY = 1.0f;
 	ground.isSolid = true;
+	ground.textureIndex = 50; // Set texture index for ground
 	platforms.push_back(ground);
 
 	BottomCheck.colorR = 0;
@@ -1015,11 +1046,11 @@ void ActiveGame()
 
 	// Make the ground
 	for (auto& ground : platforms) {
-		ground.DrawGameObject(false);
+		ground.DrawGameObject(true);
 	}
 
 	// Makes the Collectible
-	Collectible.DrawGameObject(false);
+	Collectible.DrawGameObject(true);
 
 	// Removes the Collectible
 	if (CheckCollision(Player, Collectible))
@@ -1153,7 +1184,7 @@ void EditGame()
 
 	// Make the ground
 	for (auto& ground : platforms) {
-		ground.DrawGameObject(false);
+		ground.DrawGameObject(true);
 	}
 
 	// Makes the Collectible
@@ -1214,23 +1245,39 @@ void drawRightPanel() {
 	drawSquare(15, 14, 1, 0, 0, 0, /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 
 	// Draw text box to label panel
-	drawTextWithBG("                 Inscpector",
-		0, 6.6, 14, 0.8, true);
+	drawTextWithBG("                 Inscpector", 0, 6.6, 14, 0.8, true);
 
-	// Draw text box for x coordinate label
+	// X coordinate label
 	drawTextWithBG("X:", -4, 5.6, 6, 0.5, true);
-
-	// Draw the text box
 	textInputX.draw();
 
-
+	// Y coordinate label
 	drawTextWithBG("Y:", -4, 4.8f, 6, 0.5f, true);
-
-	// Draw the text box
 	textInputY.draw();
 
+	// Z coordinate label
 	drawTextWithBG("Z:", -4, 4.0f, 6, 0.5f, true);
 	textInputZ.draw();
+
+	// X Scale label
+	drawTextWithBG("W:", -4, 3.2f, 6, 0.5f, true);
+	textInputXScale.draw();
+
+	// Y Scale label
+	drawTextWithBG("H:", -4, 2.4f, 6, 0.5f, true);
+	textInputYScale.draw();
+
+	// Texture label
+	drawTextWithBG("Texture:", -4, 1.6f, 6, 0.5f, true);
+	textInputTexture.draw();
+
+
+	// Draw the buttons
+
+
+
+
+
 
 	glPopMatrix();
 }
@@ -1330,6 +1377,9 @@ void Keyboard(unsigned char key, int x, int y)
 	textInputX.handleKeyPress(key);
 	textInputY.handleKeyPress(key);
 	textInputZ.handleKeyPress(key);
+	textInputXScale.handleKeyPress(key);
+	textInputYScale.handleKeyPress(key);
+	textInputTexture.handleKeyPress(key);
 
 	switch (key)
 	{
@@ -1446,20 +1496,58 @@ void MouseControl(int button, int state, int x, int y) {
 		if (textInputX.isInside(x, y)) {
 			textInputX.setActive(true);
 			textInputY.setActive(false);
+			textInputZ.setActive(false);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(false);
 		}
 		else if (textInputY.isInside(x, y)) {
 			textInputY.setActive(true);
 			textInputX.setActive(false);
+			textInputZ.setActive(false);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(false);
 		}
 		else if (textInputZ.isInside(x, y)) {
 			textInputX.setActive(false);
 			textInputY.setActive(false);
 			textInputZ.setActive(true);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(false);
+		}
+		else if (textInputXScale.isInside(x, y)) {
+			textInputX.setActive(false);
+			textInputY.setActive(false);
+			textInputZ.setActive(false);
+			textInputXScale.setActive(true);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(false);
+		}
+		else if (textInputYScale.isInside(x, y)) {
+			textInputX.setActive(false);
+			textInputY.setActive(false);
+			textInputZ.setActive(false);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(true);
+			textInputTexture.setActive(false);
+		}
+		else if (textInputTexture.isInside(x, y)) {
+			textInputX.setActive(false);
+			textInputY.setActive(false);
+			textInputZ.setActive(false);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(true);
 		}
 		else {
 			textInputX.setActive(false);
 			textInputY.setActive(false);
 			textInputZ.setActive(false);
+			textInputXScale.setActive(false);
+			textInputYScale.setActive(false);
+			textInputTexture.setActive(false);
 		}
 	}
 
