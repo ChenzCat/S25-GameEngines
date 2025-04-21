@@ -1237,6 +1237,12 @@ void drawMainPanel() {
 	else if (currentScene == EditScene) EditGame();
 }
 
+void drawTopPanelButtons() {
+	glPushMatrix();
+	drawTextWithBG("File", 50.0f, WIN_H - TOP_PANEL_H / 2.0f, 60.0f, TOP_PANEL_H - 10.0f, false);
+	drawTextWithBG("Help", 120.0f, WIN_H - TOP_PANEL_H/2.0f, 60.0f, TOP_PANEL_H - 10.0f, false);
+
+}
 void drawRightPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
@@ -1288,11 +1294,12 @@ void drawTopPanel() {
 
 	//glScalef(1, 20, 1);
 
-	// Blue background 
+	// Background 
 	drawSquare(20, 20, 1, 0, 0, 0, /* Red */ 42.0f / 255.0f, /* Green */ 30.0f / 255.0f, /* Blue */ 40.0f / 255.0f);
 	glPopMatrix();
 
 	// Functions
+	drawTopPanelButtons();
 	drawTopPanelMessages();
 }
 
