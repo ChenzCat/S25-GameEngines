@@ -69,6 +69,11 @@ bool showHelpMenu = false;
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
 
+int groundCount = 0;
+int collectableCount = 0;
+int hazardCount = 0;
+int exitCount = 0;
+
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Game States
@@ -304,7 +309,7 @@ GameObject Player, BottomCheck, LeftCheck, RightCheck, TopCheck, Collectible, Ex
 
 // Total Tiles, Collectibles, Hazards, Exits
 std::list<GameObject> platforms;
-std::list<GameObject> Collectibles;
+std::list<GameObject> collectibles;
 std::list<GameObject> hazards;
 std::list<GameObject> exits;
 
@@ -635,10 +640,14 @@ void hierarchyButton(Button& button) {
 
 
 // Adds a ground asset to the game
-void buttonAddGround(Button& button) {
+void buttonAddGround(Button& button) 
+{
 	// Define actions for buttons
+	groundCount++;
 	GameObject ground;
-	ground.colorG = 0;
+	ground.isSolid = true;
+	ground.gravity = true;
+	ground.textureIndex = 48;
 	platforms.emplace_back(ground);
 
 	// Top left corner is (0, 0), so if you want to make a list of 
@@ -646,9 +655,69 @@ void buttonAddGround(Button& button) {
 	// windowY rather than subtract to go down the window.
 	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
 		100, leftPanelButtons.back().windowY + 30, 200, 20,
-		hierarchyButton, "Ground " + to_string(leftPanelButtons.size()), &platforms.back());
+		hierarchyButton, "Ground " + to_string(groundCount), &platforms.back());
 
 	printf("Completed action add ground \n");
+}
+
+void buttonAddCollectable(Button& button) 
+{
+	collectableCount++;
+	GameObject collectible;
+	collectible.colorG = 0;
+	collectible.textureIndex = 18;   // uses your coffee sprites
+	collectible.isSolid = false;
+	collectible.gravity = false;
+	collectibles.emplace_back(collectible);
+
+
+	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		100, leftPanelButtons.back().windowY + 30, 200, 20,
+		hierarchyButton, "Collectable " + to_string(collectableCount), &collectibles.back());
+
+	printf("Completed action add collectable\n");
+}
+
+
+void buttonAddHazard(Button& button) 
+{
+	hazardCount++;
+	GameObject hazard;
+	hazard.colorR = 1;
+	hazard.colorG = 0;
+	hazard.colorB = 0;
+	hazard.canSee = true;
+	hazard.isSolid = false;
+	hazard.gravity = false;
+	hazards.emplace_back(hazard);
+
+
+	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		100, leftPanelButtons.back().windowY + 30, 200, 20,
+		hierarchyButton, "Hazard " + to_string(hazardCount), &hazards.back());
+
+	printf("Completed action add hazard\n");
+}
+
+
+void buttonAddExit(Button& button) 
+{
+	exitCount++;
+	GameObject exit;
+	exit.colorR = 0;
+	exit.colorG = 0;
+	exit.colorB = 1;
+	exit.canSee = true;
+	exit.isSolid = false;
+	exit.gravity = false;
+	exits.emplace_back(exit);
+
+
+	button.addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
+		100, leftPanelButtons.back().windowY + 30, 200, 20,
+		hierarchyButton, "Exit " + to_string(exitCount), &exits.back());
+
+	printf("Completed action add Exit\n");
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -684,6 +753,7 @@ void init(void) {
 	ground.sizeY = 1.0f;
 	ground.isSolid = true;
 	ground.textureIndex = 48; // Set texture index for ground
+	ground.gravity = true;
 	platforms.push_back(ground);
 
 	BottomCheck.colorR = 0;
@@ -700,14 +770,33 @@ void init(void) {
 	SoundEngine->play2D("audio/The Return of Caped Crusader Cat.mp3", true);
 
 	// Create buttons and add them to the list
-	Button button1(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &Player);
+	Button playerButton(0, 6, 14, 0.5, 100, 92, 200, 20, hierarchyButton, "Player", &Player);
 	// Add buttons to list
-	leftPanelButtons.push_back(button1);
+	leftPanelButtons.push_back(playerButton);
 
 
 	// Bottom buttons
-	Button bottomButton(-6, -1, 1, 8, 70, 763, 70, 114, buttonAddGround, "  Ground");
-	bottomPanelButtons.push_back(bottomButton);
+	Button groundButton(-6, -1, 1, 8, 70, 763, 70, 114, buttonAddGround, "  Ground");
+	groundButton.sprite = true;
+	groundButton.textureNum = 38;	// Set Preview Sprite
+	bottomPanelButtons.push_back(groundButton);
+
+	// Bottom buttons
+	Button collectableButton(-2, -1, 1, 8, 370, 763, 70, 114, buttonAddCollectable, "  Collectable");
+	collectableButton.sprite = true;
+	collectableButton.textureNum = 19;	// Set Preview Sprite
+	bottomPanelButtons.push_back(collectableButton);
+
+	Button hazardButton(2, -1, 1, 8, 670, 763, 70, 114, buttonAddHazard, "  Hazard");
+	hazardButton.sprite = true;
+	hazardButton.textureNum = 51;	// Set Preview Sprite
+	bottomPanelButtons.push_back(hazardButton);
+
+	// Exit button
+	Button exitButton(6, -1, 1, 8, 970, 763, 70, 114, buttonAddExit, "  Goal");
+	exitButton.sprite = true;
+	exitButton.textureNum = 50;		// Set Preview Sprite
+	bottomPanelButtons.push_back(exitButton);
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1077,12 +1166,58 @@ void ActiveGame()
 		ground.DrawGameObject(true);
 	}
 
-	// Makes the Collectible
-	Collectible.DrawGameObject(true);
+	for (auto& c : collectibles) {
+		c.DrawGameObject(true);
+	}
 
-	// Removes the Collectible
-	if (CheckCollision(Player, Collectible))
-		Collectible.destroyed = true;
+	// Draw all hazards:
+	for (auto& h : hazards) {
+		h.DrawGameObject(true);
+	}
+
+	// Draw all exits:
+	for (auto& e : exits) {
+		e.DrawGameObject(true);
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	for (auto& c : collectibles) {
+		if (!c.destroyed && CheckCollision(Player, c)) {
+			c.destroyed = true;
+			coffeeCollected++;
+		}
+	}
+
+	// Hazards
+	for (auto& h : hazards) {
+		if (CheckCollision(Player, h)) {
+			currentScene = LoseScene;
+			playLoseMusic();
+		}
+	}
+
+	// Exit
+	for (auto& e : exits) {
+		if (CheckCollision(Player, e)) {
+			currentScene = WinScene;
+			playWinMusic();
+		}
+	}
+
+
+
 
 		gravityCheck();
 		CreateMechanics();
@@ -1215,12 +1350,19 @@ void EditGame()
 		ground.DrawGameObject(true);
 	}
 
-	// Makes the Collectible
-	Collectible.DrawGameObject(false);
+	for (auto& c : collectibles) {
+		c.DrawGameObject(true);
+	}
 
-	// Removes the Collectible
-	if (CheckCollision(Player, Collectible))
-		Collectible.destroyed = true;
+	// Draw all hazards:
+	for (auto& h : hazards) {
+		h.DrawGameObject(true);
+	}
+
+	// Draw all exits:
+	for (auto& e : exits) {
+		e.DrawGameObject(true);
+	}
 
 	if (gravityOn)
 		gravityCheck();
