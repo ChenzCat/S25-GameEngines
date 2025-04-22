@@ -61,7 +61,6 @@ static int timeLeft = 60;
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 bool gridMode = true;
-bool dragging = false;
 bool displaySceneStateDisplay = true;
 bool showFileMenu = false;
 bool showHelpMenu = false;
@@ -626,6 +625,9 @@ void hierarchyButton(Button& button) {
 		textInputTexture.gameObject = o;
 		cout << "hierarchyButton: loaded Texture = " << o->textureIndex << endl;
 
+		for (auto& tb : rightPanelButtons) {
+			tb.gameObject = o;
+		}
 	}
 	else {
 		cout << "hierarchyButton: Button's gameObject is null" << endl;
@@ -635,8 +637,20 @@ void hierarchyButton(Button& button) {
 }
 
 
-
-
+void toggleCollision(Button& b) {
+	if (!b.gameObject) return;
+	b.gameObject->isSolid = !b.gameObject->isSolid;
+}
+void toggleVisible(Button& b) {
+	if (!b.gameObject) return;
+	b.gameObject->canSee = !b.gameObject->canSee;
+}
+void toggleGravity(Button& b) {
+	if (!b.gameObject) return;
+	b.gameObject->gravity = !b.gameObject->gravity;
+	std::cout << "Gravity is now "
+		<< (b.gameObject->gravity ? "ON\n" : "OFF\n");
+}
 
 
 // Adds a ground asset to the game
@@ -722,6 +736,24 @@ void buttonAddExit(Button& button)
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// Object Settings
+void applyGravityToObjects() {
+	// any object with gravity==true will fall
+	for (auto& platform : platforms) {
+		if (platform.gravity) platform.y -= gravity;
+	}
+	for (auto& collectible : collectibles) {
+		if (collectible.gravity && !collectible.destroyed) collectible.y -= gravity;
+	}
+	for (auto& hazard : hazards) {
+		if (hazard.gravity) hazard.y -= gravity;
+	}
+	for (auto& exit : exits) {
+		if (exit.gravity) exit.y -= gravity;
+	}
+}
+
+
 void init(void) {
 
 	glClearColor((52.0f / 255.0f), (32.0f / 255.0f), (43.0f / 255.0f), 1.0f);
@@ -797,6 +829,12 @@ void init(void) {
 	exitButton.sprite = true;
 	exitButton.textureNum = 50;		// Set Preview Sprite
 	bottomPanelButtons.push_back(exitButton);
+
+
+	// Right Panel Buttons
+	rightPanelButtons.emplace_back(3.5f, 5.6f, 1.0f, 0.5f, 955, 105, 80, 30, toggleCollision, "Toggle", nullptr);
+	rightPanelButtons.emplace_back(3.5f, 4.8f, 1.0f, 0.5f, 955, 140, 80, 30, toggleVisible, "Toggle", nullptr);
+	rightPanelButtons.emplace_back(3.5f, 4.0f, 1.0f, 0.5f, 955, 175, 80, 30, toggleGravity, "Toggle", nullptr);
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1218,7 +1256,7 @@ void ActiveGame()
 
 
 
-
+		applyGravityToObjects();
 		gravityCheck();
 		CreateMechanics();
 	//Movement
@@ -1364,6 +1402,7 @@ void EditGame()
 		e.DrawGameObject(true);
 	}
 
+	applyGravityToObjects;
 	if (gravityOn)
 		gravityCheck();
 
@@ -1452,6 +1491,8 @@ void drawRightPanel() {
 
 	// Gravity label
 	drawTextWithBG("Gravity:", 3, 4.0, 6, 0.5, true);
+
+	for (auto& btn : rightPanelButtons) btn.draw();
 
 
 	// Draw the buttons
@@ -1740,6 +1781,12 @@ void MouseControl(int button, int state, int x, int y) {
 		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 		if (clickedPanel == "Right Panel")
 		{
+			for (auto& btn : rightPanelButtons) {
+				if (btn.isInside(x, y)) {
+					btn.handleClick();
+					return;
+				}
+			}
 			if (textInputX.isInside(x, y))
 			{
 				textInputX.setActive(true);
