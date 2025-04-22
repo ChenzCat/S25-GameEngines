@@ -63,6 +63,8 @@ static int timeLeft = 60;
 bool gridMode = true;
 bool dragging = false;
 bool displaySceneStateDisplay = true;
+bool showFileMenu = false;
+bool showHelpMenu = false;
 
 float editorCameraX = 0.0f;
 float editorCameraY = 0.0f;
@@ -556,7 +558,7 @@ public:
 };
 
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
-list<Button> leftPanelButtons, bottomPanelButtons;
+list<Button> leftPanelButtons, bottomPanelButtons, rightPanelButtons;
 
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -578,7 +580,7 @@ TextInput textInputXScale(-5.8f, 3.0f, 4.5f, 0.4f, 850, 213, 66, 14, "", TextInp
 TextInput textInputYScale(-5.8f, 2.2f, 4.5f, 0.4f, 850, 247, 66, 14, "", TextInput::Y_SCALE);
 
 // Text input box button Texture
-TextInput textInputTexture(-5.8f, 1.4f, 4.5f, 0.4f, 850, 281, 66, 14, "", TextInput::TEXTURE);
+TextInput textInputTexture(-3.2f, 1.4f, 1.9f, 0.4f, 850, 281, 66, 14, "", TextInput::TEXTURE);
 
 
 
@@ -681,7 +683,7 @@ void init(void) {
 	ground.sizeX = 10.0f;
 	ground.sizeY = 1.0f;
 	ground.isSolid = true;
-	ground.textureIndex = 50; // Set texture index for ground
+	ground.textureIndex = 48; // Set texture index for ground
 	platforms.push_back(ground);
 
 	BottomCheck.colorR = 0;
@@ -721,7 +723,7 @@ void CreateMechanics()
 	for (char c : timerText)
 		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
 
-	glRasterPos2f(Player.x + 4.3f, Player.y + 8.0f);
+	glRasterPos2f(Player.x + 4.0f, Player.y + 9.5f);
 	string coinText = "Espresso: " + to_string(coffeeCollected) + "/" + to_string(totalcoffee);
 	for (char c : coinText)
 		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
@@ -1025,7 +1027,33 @@ void drawTopPanelMessages()
 	glPopMatrix();
 }
 
+void drawTopPanelButtons() {
+	glPushMatrix();
+	 
+	glPopMatrix();
+}
 
+void topbarLogic()
+{ 
+	glPushMatrix();
+	drawTextWithBG("File", 0.0f, 3.9f, 14.0f, 0.4f, false);
+		if (showFileMenu) {
+			drawSquare(0.5, 10, 1, -13.5f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawTextWithBG("Quit", 0.0f, -2.0f, 14.0f, 0.4f, false);
+		}
+	glPopMatrix();
+
+
+	glPushMatrix();
+	drawTextWithBG("Help", 0.5f, 3.9f, 14.0f, 0.4f, false);
+		if (showHelpMenu) {
+			drawSquare(2.85f, 10, 1, -1.775f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawTextWithBG("Controls", 0.5f, -2.0f, 14.0f, 0.4f, false);
+			drawTextWithBG("About", 1.5f, -2.0f, 14.0f, 0.4f, false);
+			drawTextWithBG("Contact", 2.5f, -2.0f, 14.0f, 0.4f, false);
+		}
+	glPopMatrix();
+}
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Main Panel Scenes
@@ -1213,7 +1241,7 @@ void drawLeftPanel() {
 	glPushMatrix();
 	glViewport(0, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
 
-	// Dark Grey background
+	// Draw Background
 	drawSquare(15, 14, 1, 0, 0, 0,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 
 	// Draw text box to label panel
@@ -1237,12 +1265,6 @@ void drawMainPanel() {
 	else if (currentScene == EditScene) EditGame();
 }
 
-void drawTopPanelButtons() {
-	glPushMatrix();
-	drawTextWithBG("File", 50.0f, WIN_H - TOP_PANEL_H / 2.0f, 60.0f, TOP_PANEL_H - 10.0f, false);
-	drawTextWithBG("Help", 120.0f, WIN_H - TOP_PANEL_H/2.0f, 60.0f, TOP_PANEL_H - 10.0f, false);
-
-}
 void drawRightPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
@@ -1274,8 +1296,20 @@ void drawRightPanel() {
 	textInputYScale.draw();
 
 	// Texture label
-	drawTextWithBG("Texture:", -4, 1.6f, 6, 0.5f, true);
+	drawTextWithBG("Sprite ID:", -4, 1.6f, 6, 0.5f, true);
 	textInputTexture.draw();
+
+	// ---------------------------------------------------------------------------------------------------------------------------------------
+	// Draw Right Panel Buttons
+
+	// Collision label
+	drawTextWithBG("Collision:", 3, 5.6, 6, 0.5, true);
+
+	// Visibility label
+	drawTextWithBG("Visible:", 3, 4.8, 6, 0.5, true);
+
+	// Gravity label
+	drawTextWithBG("Gravity:", 3, 4.0, 6, 0.5, true);
 
 
 	// Draw the buttons
@@ -1288,11 +1322,11 @@ void drawRightPanel() {
 	glPopMatrix();
 }
 
+
+
 void drawTopPanel() {
 	glPushMatrix();
 	glViewport(0, WIN_H - TOP_PANEL_H, WIN_W, TOP_PANEL_H);
-
-	//glScalef(1, 20, 1);
 
 	// Background 
 	drawSquare(20, 20, 1, 0, 0, 0, /* Red */ 42.0f / 255.0f, /* Green */ 30.0f / 255.0f, /* Blue */ 40.0f / 255.0f);
@@ -1300,6 +1334,8 @@ void drawTopPanel() {
 
 	// Functions
 	drawTopPanelButtons();
+	topbarLogic();
+
 	drawTopPanelMessages();
 }
 
@@ -1478,85 +1514,157 @@ void MouseControl(int button, int state, int x, int y) {
 			clickedPanel = "Top Panel";
 		}
 
-		cout << "Clicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
+		cout << "\nClicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 
-		// Check if any button was clicked
-		for (auto& button : leftPanelButtons) {
-			if (button.isInside(x, y)) {
-				button.handleClick(); // Trigger the action associated with the button
-				break; // Exit the loop after handling the click for one button
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		if (clickedPanel == "Left Panel")
+		{
+			// Check if any button was clicked
+			for (auto& button : leftPanelButtons) {
+				if (button.isInside(x, y)) {
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
 			}
 		}
 
-		for (auto& button : bottomPanelButtons) {
-			if (button.isInside(x, y)) {
-				button.handleClick(); // Trigger the action associated with the button
-				break; // Exit the loop after handling the click for one button
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		if (clickedPanel == "Bottom Panel")
+		{
+			for (auto& button : bottomPanelButtons) {
+				if (button.isInside(x, y)) {
+					button.handleClick(); // Trigger the action associated with the button
+					break; // Exit the loop after handling the click for one button
+				}
+			}
+		}
+
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		if (clickedPanel == "Top Panel") {
+			// File menu is open?
+			if (showFileMenu) {
+				// Quit button area
+				if (x >= 5 && x <= 30 && y >= 25 && y <= 70)
+				{
+
+					std::cout << "Quit selected, exiting.\n";
+					exit(0);
+				}
+				showFileMenu = false;
+				return;
+			}
+
+			// Help menu is open?
+			if (showHelpMenu) {
+				// Controls
+				if (x >= 40 && x <= 85 && y >= 25 && y <= 70)
+				{
+					std::cout << "\nControls:\n Arrow Keys: Move the Player\n Space Bar: Jump\n 'a': Toggle axis\n 'g': Start Game\n 'p': Pause Game\n 's': Debug Collider Boxs\n ESC: Exit\n";
+					return;
+				}
+				// About
+				if(x >= 108 && x <= 140 && y >= 25 && y <= 70)
+				{
+					std::cout << "\nAbout:\n This is an editor which allows the user to place: Platforms, Hazards, Collectibles, and a Exit\n Collect all Espresso, reach the exit, before the timer reaches 0\n ";
+					return;
+				}
+				// Contact
+				if(x >= 185 && x <= 230 && y >= 25 && y <= 70)
+				{
+					std::cout << "\nSpawning virtual consultant :)\nAvatar: Giant Spider\nHeading to #### #### Kent, OH\n\nSee you soon, User ID: mbektic!\n";
+					return;
+				}
+				showHelpMenu = false;
+				return;
+			}
+
+			// Toggle menus
+			if (x >= 5 && x <= 30) {
+				showFileMenu = true;
+				showHelpMenu = false;
+			}
+			else if (x >= 40 && x <= 70) {
+				showHelpMenu = true;
+				showFileMenu = false;
+			}
+			else {
+				showFileMenu = false;
+				showHelpMenu = false;
+			}
+			return;
+		}
+
+
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		if (clickedPanel == "Right Panel")
+		{
+			if (textInputX.isInside(x, y))
+			{
+				textInputX.setActive(true);
+				textInputY.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(false);
+			}
+			else if (textInputY.isInside(x, y))
+			{
+				textInputY.setActive(true);
+				textInputX.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(false);
+			}
+			else if (textInputZ.isInside(x, y))
+			{
+				textInputX.setActive(false);
+				textInputY.setActive(false);
+				textInputZ.setActive(true);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(false);
+			}
+			else if (textInputXScale.isInside(x, y))
+			{
+				textInputX.setActive(false);
+				textInputY.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(true);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(false);
+			}
+			else if (textInputYScale.isInside(x, y))
+			{
+				textInputX.setActive(false);
+				textInputY.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(true);
+				textInputTexture.setActive(false);
+			}
+			else if (textInputTexture.isInside(x, y))
+			{
+				textInputX.setActive(false);
+				textInputY.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(true);
+			}
+			else
+			{
+				textInputX.setActive(false);
+				textInputY.setActive(false);
+				textInputZ.setActive(false);
+				textInputXScale.setActive(false);
+				textInputYScale.setActive(false);
+				textInputTexture.setActive(false);
 			}
 		}
 	}
-	int invertedY = WIN_H - y;
 
-	// Check if clicked in or out of text box to set as active or not.
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) 
-	{
-		if (textInputX.isInside(x, y)) {
-			textInputX.setActive(true);
-			textInputY.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(false);
-		}
-		else if (textInputY.isInside(x, y)) {
-			textInputY.setActive(true);
-			textInputX.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(false);
-		}
-		else if (textInputZ.isInside(x, y)) {
-			textInputX.setActive(false);
-			textInputY.setActive(false);
-			textInputZ.setActive(true);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(false);
-		}
-		else if (textInputXScale.isInside(x, y)) {
-			textInputX.setActive(false);
-			textInputY.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(true);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(false);
-		}
-		else if (textInputYScale.isInside(x, y)) {
-			textInputX.setActive(false);
-			textInputY.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(true);
-			textInputTexture.setActive(false);
-		}
-		else if (textInputTexture.isInside(x, y)) {
-			textInputX.setActive(false);
-			textInputY.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(true);
-		}
-		else {
-			textInputX.setActive(false);
-			textInputY.setActive(false);
-			textInputZ.setActive(false);
-			textInputXScale.setActive(false);
-			textInputYScale.setActive(false);
-			textInputTexture.setActive(false);
-		}
-	}
+	
 
 	glutPostRedisplay();
 }
@@ -1677,7 +1785,7 @@ void cycleRunFrames()
 		PlayerAnimFrame++;
 		if (PlayerAnimFrame > 7) PlayerAnimFrame = 0;
 	}
-}	
+}
 
 
 //
@@ -1759,18 +1867,6 @@ int main(int argc, char** argv) {
 
 	// Terminal Msgs
 	std::cout << std::endl;
-	std::cout << "Controls:\n";
-	std::cout << "Arrow Keys: Move the Player\n";
-	std::cout << "Space Bar: Jump\n";
-	std::cout << "'a': Toggle axis\n";
-	std::cout << "'g': Start Game\n";
-	std::cout << "'p': Pause Game\n";
-	std::cout << "'s': Debug Collider Boxs\n";
-	std::cout << "ESC: Exit\n\n";
-
-	std::cout << "Bonus Features:\n";
-	std::cout << "Movement State Conditions\n\n";
-
 	std::cout << "Credits:\n";
 	std::cout << "The Legend of Zelda: Majora's Mask\n";
 	std::cout << "Bakudas: Generic Dungeon Pack\n";
