@@ -1983,7 +1983,7 @@ void MouseControl(int button, int state, int x, int y) {
 			// File Menu Open
 			if (showFileMenu) 
 			{
-				if (x >= 50 && x < 150 && y >= 25 && y <= 70) {
+				if (x >= 70 && x < 150 && y >= 25 && y <= 70) {
 					// call save routines
 					saveGameObjects("platforms", platforms);
 					saveGameObjects("collectibles", collectibles);
@@ -2000,7 +2000,7 @@ void MouseControl(int button, int state, int x, int y) {
 
 
 				// LOAD
-				if (x >= 150 && x < 250 && y >= 25 && y <= 70) {
+				if (x >= 35 && x < 60 && y >= 25 && y <= 70) {
 					loadGameObjects("platforms", platforms);
 					loadGameObjects("collectibles", collectibles);
 					loadGameObjects("hazards", hazards);
