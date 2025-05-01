@@ -12,6 +12,7 @@
 #include <list>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <functional>
 #include <string>
 #include <IrrKlang/irrKlang.h>
@@ -1376,7 +1377,7 @@ void drawTopPanelMessages()
 		}
 	}
 	glPopMatrix();
-}
+} 
 
 void drawTopPanelButtons() 
 {
@@ -1391,8 +1392,12 @@ void topbarLogic()
 	drawTextWithBG("File", 0.0f, 3.9f, 14.0f, 0.4f, false);
 		if (showFileMenu) 
 		{
-			drawSquare(0.5, 10, 1, -13.5f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawSquare(1.85f, 10.0f, 1, -3.35f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			// Menu Entries
+			drawTextWithBG("Save", 1.2f, -2.0f, 14.0f, 0.4f, false);
+			drawTextWithBG("Load", 0.6f, -2.0f, 14.0f, 0.4f, false);
 			drawTextWithBG("Quit", 0.0f, -2.0f, 14.0f, 0.4f, false);
+
 		}
 	glPopMatrix();
 
@@ -1400,7 +1405,7 @@ void topbarLogic()
 	drawTextWithBG("Help", 0.5f, 3.9f, 14.0f, 0.4f, false);
 		if (showHelpMenu) 
 		{
-			drawSquare(2.85f, 10, 1, -1.775f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawSquare(2.85f, 10.0f, 1, -1.775f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
 			drawTextWithBG("Controls", 0.5f, -2.0f, 14.0f, 0.4f, false);
 			drawTextWithBG("About", 1.5f, -2.0f, 14.0f, 0.4f, false);
 			drawTextWithBG("Contact", 2.5f, -2.0f, 14.0f, 0.4f, false);
@@ -1732,6 +1737,52 @@ void MyDisplay()
 	glutSwapBuffers();
 }
 
+// -----------------------------------------------------------------------------------------
+
+// Saving and Loading Scenes
+
+void saveGameObjects(const std::string& filename, const std::list<GameObject>& objects) {
+	std::ofstream out("save/" + filename + ".txt", std::ios::out | std::ios::trunc);
+	if (!out) { std::cerr << "Failed opening save/" << filename << ".txt\n"; return; }
+	out << objects.size() << "\n";
+	for (auto& o : objects) {
+		out
+			<< o.x << ' ' << o.y << ' ' << o.z << ' '
+			<< o.sizeX << ' ' << o.sizeY << ' '
+			<< o.colorR << ' ' << o.colorG << ' ' << o.colorB << ' '
+			<< o.mass << ' '
+			<< o.canSee << ' ' << o.isSolid << ' '
+			<< o.destroyed << ' ' << o.gravity << ' '
+			<< o.textureIndex
+			<< "\n";
+	}
+}
+
+void loadGameObjects(const std::string& filename, std::list<GameObject>& objects) {
+	std::ifstream in("save/" + filename + ".txt");
+	if (!in) { std::cerr << "Failed opening save/" << filename << ".txt\n"; return; }
+	objects.clear();
+	size_t count;
+	in >> count;
+	for (size_t i = 0; i < count; ++i) {
+		GameObject o;
+		in
+			>> o.x >> o.y >> o.z
+			>> o.sizeX >> o.sizeY
+			>> o.colorR >> o.colorG >> o.colorB
+			>> o.mass
+			>> o.canSee >> o.isSolid
+			>> o.destroyed >> o.gravity
+			>> o.textureIndex;
+		objects.push_back(o);
+	}
+}
+
+
+
+
+
+
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Controls
@@ -1932,13 +1983,47 @@ void MouseControl(int button, int state, int x, int y) {
 			// File Menu Open
 			if (showFileMenu) 
 			{
+				if (x >= 50 && x < 150 && y >= 25 && y <= 70) {
+					// call save routines
+					saveGameObjects("platforms", platforms);
+					saveGameObjects("collectibles", collectibles);
+					saveGameObjects("hazards", hazards);
+					saveGameObjects("exits", exits);
+					if (playerActive) {
+						std::list<GameObject> tmp{ Player };
+						saveGameObjects("player", tmp);
+					}
+					std::cout << "Scene saved.\n";
+					showFileMenu = false;
+					return;
+				}
+
+
+				// LOAD
+				if (x >= 150 && x < 250 && y >= 25 && y <= 70) {
+					loadGameObjects("platforms", platforms);
+					loadGameObjects("collectibles", collectibles);
+					loadGameObjects("hazards", hazards);
+					loadGameObjects("exits", exits);
+					{
+						std::list<GameObject> tmp;
+						loadGameObjects("player", tmp);
+						if (!tmp.empty()) Player = tmp.front();
+					}
+					std::cout << "Scene loaded.\n";
+					showFileMenu = false;
+					return;
+				}
+
+
 				// Quit area
 				if (x >= 5 && x <= 30 && y >= 25 && y <= 70)
 				{
-
 					std::cout << "Quit selected, exiting.\n";
 					exit(0);
 				}
+
+
 				showFileMenu = false;
 				return;
 			}
