@@ -40,7 +40,6 @@ bool dropDown; // Toggle the drop down menu
 bool fileDropDown, helpDropDown;
 bool buttonClicked = false; // Check if drop down button was clicked so button behind doesn't click
 
-int textInputType;
 
 // Creates sound engine
 ISoundEngine* SoundEngine = createIrrKlangDevice();
@@ -77,8 +76,7 @@ public:
 	bool	  canSee;
 	bool      isSolid;
 	bool      destroyed;
-	bool	  collision; // Use this to toggle collision on/off for gameObjects.
-	bool      gravity; // use the y variable and apply the gravity scale value we have to it.
+	bool      gravity;
 
 
 	// Default constructor
@@ -87,9 +85,9 @@ public:
 		sizeX(1), sizeY(1),
 		colorR(1), colorG(1), colorB(1),
 		mass(0), canSee(true), isSolid(false),
-		destroyed(false), collision(true), gravity(false) {}
+		destroyed(false), gravity(false) {}
 
-	void DrawGameObject(bool sprite, int textureNum) {
+	void DrawGameObject(bool sprite) {
 		glPushMatrix();
 		glTranslatef(x, y, z);
 
@@ -101,7 +99,7 @@ public:
 
 				glEnable(GL_TEXTURE_2D); // Enable texturing
 
-				glBindTexture(GL_TEXTURE_2D, texID[textureNum]); // Which texture
+				glBindTexture(GL_TEXTURE_2D, texID[frame]); // Which texture
 
 				glBegin(GL_POLYGON);
 				glTexCoord2f(0.0, 0.0);
@@ -179,6 +177,8 @@ public:
 // Gameobjects on the screen
 GameObject player, bottomCheck, leftCheck, rightCheck, topCheck, collectible;
 
+list<GameObject> platforms;
+
 class TextInput {
 public:
 	float x, y; // Position of the text input box in the viewport
@@ -216,27 +216,9 @@ public:
 			else if ((key >= '0' && key <= '9') || key == '.' || key == '-') {
 				text += key;
 			}
-			if (gameObject != nullptr) {
+			if (gameObject != nullptr)
 				// Update the x value whenever a valid character is entered
-				switch (textInputType)
-				{
-				case 0:
-					gameObject->x = textToFloat();
-					break;
-				case 1:
-					gameObject->y = textToFloat();
-					break;
-				case 2:
-					gameObject->z = textToFloat();
-					break;
-				case 3:
-					gameObject->sizeX = textToFloat();
-					break;
-				case 4:
-					gameObject->sizeY = textToFloat();
-					break;
-				}
-			}
+				gameObject->x = textToFloat();
 		}
 	}
 
@@ -276,6 +258,7 @@ public:
 	}
 };
 
+// Button class
 class Button {
 public:
 	float x, y; // Position of the button in the viewport
@@ -289,17 +272,15 @@ public:
 	GameObject* gameObject; // Used to get and set the variables of the game object
 	int textureNum; // Texture number
 	bool sprite; // If there is a sprite or not
-	bool toggled; // Indicates whether the button has been clicked
-
 
 	// x, y, w, h, windowX, windowY, windowWidth, windowHeight, text, buttonAction, gameObject pointer
 	// Updated to allow for the passing of a gameObject reference but is not necessary
 	Button(float posX, float posY, float w, float h,
 		float winX, float winY, float winW, float winH,
-		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr, int texture = 0, bool pic = true, bool tog = false)
+		function<void(Button&)> act, const string& txt, GameObject* obj = nullptr)
 		: x(posX), y(posY), width(w), height(h),
 		windowX(winX), windowY(winY), windowWidth(winW), windowHeight(winH),
-		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(texture), sprite(pic), toggled(tog) {}
+		text(txt), buttonAction(act), clicked(false), gameObject(obj), textureNum(0), sprite(false) {}
 
 	bool isInside(int mouseX, int mouseY) {
 		// Calculate the boundaries of the button
@@ -320,9 +301,8 @@ public:
 
 	// Method to handle button click
 	void handleClick() {
-		toggled = !toggled;
 		if (buttonAction) {
-			buttonAction(*this); // Invoke the action handler
+			buttonAction(*this); // Invoke the action handler and passes the button now
 		}
 	}
 
@@ -346,7 +326,6 @@ public:
 
 		// Adjust vertical position to center the text vertically within the button
 		float textY = centerY + (height - 0.2) / 2;
-
 
 		// Draw the button text
 		glColor3f(0.0f, 0.0f, 0.0f); // Black color for the text
@@ -418,53 +397,6 @@ public:
 		}
 	}
 
-	void drawToggleButton()
-	{
-		// Calculate the position to center the button
-		float centerX = x - width / 2;
-		float centerY = y - height / 2;
-
-		// Draw the button background using the calculated center position
-		glColor3f(0.6f, 0.6f, 0.6f); // Light gray color for the button
-		glBegin(GL_QUADS);
-		glVertex3f(centerX, centerY, 0);
-		glVertex3f(centerX + width, centerY, 0);
-		glVertex3f(centerX + width, centerY + height, 0);
-		glVertex3f(centerX, centerY + height, 0);
-		glEnd();
-
-		// Define separate width and height for the smaller square
-		float smallSquareWidth = width * 0.6f;
-		float smallSquareHeight = height * 0.6f;
-
-		// Calculate the position to center the smaller square
-		float smallSquareX = centerX + (width - smallSquareWidth) / 2;
-		float smallSquareY = centerY + (height - smallSquareHeight) / 2;
-
-		// Draw the button background using the calculated center position
-		if (toggled) {
-			// Draw a smaller filled square inside the button
-			glColor3f(0.0f, 1.0f, 0.0f); // Green color for the small square
-			glBegin(GL_QUADS);
-			glVertex3f(smallSquareX, smallSquareY, 0);
-			glVertex3f(smallSquareX + smallSquareWidth, smallSquareY, 0);
-			glVertex3f(smallSquareX + smallSquareWidth, smallSquareY + smallSquareHeight, 0);
-			glVertex3f(smallSquareX, smallSquareY + smallSquareHeight, 0);
-			glEnd();
-		}
-		else {
-			// Draw a smaller filled square inside the button
-			glColor3f(1.0f, 1.0f, 1.0f); // White color for the small square
-			glBegin(GL_QUADS);
-			glVertex3f(smallSquareX, smallSquareY, 0);
-			glVertex3f(smallSquareX + smallSquareWidth, smallSquareY, 0);
-			glVertex3f(smallSquareX + smallSquareWidth, smallSquareY + smallSquareHeight, 0);
-			glVertex3f(smallSquareX, smallSquareY + smallSquareHeight, 0);
-			glEnd();
-		}
-
-	}
-
 	// Static method to create and add a new button to a specified list
 	static void addToList(list<Button>& buttonList, float x, float y, float w, float h,
 		float winX, float winY, float winW, float winH,
@@ -475,28 +407,15 @@ public:
 	}
 };
 
-
 // List of buttons (Hint: You could make multiple lists for the different panels buttons)
-list<Button> leftPanelButtons, topPanelButtons, bottomPanelButtons, fileDropDownButtons, helpDropDownButtons, rightPanelButtons;
+list<Button> leftPanelButtons, bottomPanelButtons;
 
-list<GameObject> platforms;
-list<GameObject> collectables;
-list<TextInput> textInputs;
-list<GameObject> flags;
+list<Button> topPanelButtons;
 
+list<Button> fileDropDownButtons, helpDropDownButtons;
 
 // Text input variable
-TextInput textInputX(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
-TextInput textInputY(-5.8, 4.9, 4.5, 0.4, 850, textInputX.windowY + 17, 66, 14, "");
-TextInput textInputZ(-5.8, 4.4, 4.5, 0.4, 850, textInputY.windowY + 17, 66, 14, "");
-TextInput textInputScaleX(-3.5, 3.9, 4, 0.4, 879, 173, 60, 16, "");
-TextInput textInputScaleY(-3.5, 3.4, 4, 0.4, 879, textInputScaleX.windowY + 22, 60, 16, "");
-
-void collisionToggleAction(Button&);
-void gravityToggleAction(Button&);
-
-Button toggleButton1(0, 3.1, 1.5, 0.5, 900, 214, 20, 20, collisionToggleAction, "");
-Button toggleButton2(0, 2.6, 1.5, 0.5, 900, toggleButton1.windowY + 15, 20, 20, gravityToggleAction, "");
+TextInput textInput(-5.8, 5.4, 4.5, 0.4, 850, 109, 66, 14, "");
 
 static void addToList(list<Button>& buttonList, float x, float y, float w, float h,
 	float winX, float winY, float winW, float winH,
@@ -511,24 +430,8 @@ static void addToList(list<Button>& buttonList, float x, float y, float w, float
 void hierarchyButton(Button& button) {
 	if (button.gameObject != nullptr) {
 		// Update textInput with gameObject's x-coordinate
-		textInputX.text = to_string(button.gameObject->x);
-		textInputY.text = to_string(button.gameObject->y);
-		textInputZ.text = to_string(button.gameObject->z);
-		textInputScaleX.text = to_string(button.gameObject->sizeX);
-		textInputScaleY.text = to_string(button.gameObject->sizeY);
-
-
-		textInputX.gameObject = button.gameObject;
-		textInputY.gameObject = button.gameObject;
-		textInputZ.gameObject = button.gameObject;
-		textInputScaleX.gameObject = button.gameObject;
-		textInputScaleY.gameObject = button.gameObject;
-
-		toggleButton1.gameObject = button.gameObject;
-		toggleButton2.gameObject = button.gameObject;
-
-		toggleButton1.toggled = button.gameObject->collision;
-		toggleButton2.toggled = button.gameObject->gravity;
+		textInput.text = to_string(button.gameObject->x);
+		textInput.gameObject = button.gameObject;
 	}
 	else {
 		cout << "Button's gameObject is null" << endl;
@@ -599,7 +502,7 @@ void saveGameObjects(list<GameObject>& gameObjects, const string& filename) {
 			<< gameObject.sizeX << " " << gameObject.sizeY << " "
 			<< gameObject.colorR << " " << gameObject.colorG << " " << gameObject.colorB << " "
 			<< gameObject.mass << " " << gameObject.canSee << " " << gameObject.isSolid << " "
-			<< gameObject.destroyed << " " << gameObject.collision << " " << gameObject.gravity << endl;
+			<< gameObject.destroyed << " " << gameObject.gravity << endl;
 	}
 
 	outputFile.close();
@@ -629,7 +532,7 @@ void loadGameObjects(list<GameObject>& gameObjects, const string& filename) {
 			>> gameObject.colorR >> gameObject.colorG >> gameObject.colorB
 			>> gameObject.mass >> gameObject.canSee
 			>> gameObject.isSolid >> gameObject.destroyed
-			>> gameObject.collision >> gameObject.gravity;
+			>> gameObject.gravity;
 		gameObjects.emplace_back(gameObject);
 
 		addToList(leftPanelButtons, 0, leftPanelButtons.back().y - 0.7, 14, 0.5,
@@ -667,28 +570,6 @@ void tempButton(Button& button) {
 	fileDropDown = false;
 	helpDropDown = false;
 	printf("Completed action 5 \n");
-}
-
-void collisionToggleAction(Button& button) {
-	// Define actions for buttons
-	if (toggleButton1.gameObject != nullptr) {
-		toggleButton1.toggled = !toggleButton1.toggled;
-		toggleButton1.gameObject->collision = toggleButton1.toggled;
-		printf("Toggle collision action \n");
-	}
-	else
-		printf("Collision Toggle Failed \n");
-}
-
-void gravityToggleAction(Button& button) {
-	// Define actions for buttons
-	if (toggleButton2.gameObject != nullptr) {
-		toggleButton2.toggled = !toggleButton2.toggled;
-		toggleButton2.gameObject->gravity = toggleButton2.toggled;
-		printf("Toggle gravity action \n");
-	}
-	else
-		printf("Gravity Toggle Failed \n");
 }
 
 void init(void) {
@@ -738,12 +619,7 @@ void init(void) {
 
 	// Bottom buttons
 	Button bottomButton(-6, -1, 1, 8, 70, 763, 70, 114, buttonAddGround, "  Ground");
-	// Makes sprite false on ground button
-	bottomButton.sprite = false;
 	bottomPanelButtons.push_back(bottomButton);
-
-	rightPanelButtons.push_back(toggleButton1);
-	rightPanelButtons.push_back(toggleButton2);
 }
 
 void CreatePlayer(bool show) {
@@ -778,10 +654,10 @@ void CreatePlayer(bool show) {
 
 	topCheck.canSee = show;
 
-	bottomCheck.DrawGameObject(false, 0);
-	leftCheck.DrawGameObject(false, 0);
-	rightCheck.DrawGameObject(false, 0);
-	topCheck.DrawGameObject(false, 0);
+	bottomCheck.DrawGameObject(false);
+	leftCheck.DrawGameObject(false);
+	rightCheck.DrawGameObject(false);
+	topCheck.DrawGameObject(false);
 	glPopMatrix();
 }
 
@@ -917,11 +793,11 @@ void drawMainPanel() {
 
 	// Make the ground
 	for (auto& ground : platforms) {
-		ground.DrawGameObject(false, 0);
+		ground.DrawGameObject(false);
 	}
 
 	// Makes the collectible
-	collectible.DrawGameObject(false, 0);
+	collectible.DrawGameObject(false);
 
 	// Removes the collectible
 	if (CheckCollision(player, collectible))
@@ -943,50 +819,19 @@ void drawRightPanel() {
 	glPushMatrix();
 	glViewport(SIDE_PANEL_W + MAIN_PANEL_W, BOTTOM_PANEL_H, SIDE_PANEL_W, MIDDLE_PANEL_H);
 
-	// Dark Grey background
-	drawSquare(15, 14, 1, 0, 0, 0, 0.7, 0.7, 0.7);
+	// Green background
+	drawSquare(15, 14, 1, 0, 0, 0, 0.5, 0.5, 0.5);
 
 	// Draw text box to label panel
-	drawTextWithBG("                 Inspector",
+	drawTextWithBG("                 Inscpector",
 		0, 6.6, 14, 0.8, true);
 
 	// Draw text box for x coordinate label
 	drawTextWithBG("X:",
 		-4, 5.6, 6, 0.5, true);
 
-	// Draw text box for y coordinate label
-	drawTextWithBG("Y:",
-		-4, 5.1, 6, 0.5, true);
-
-	// Draw text box for z coordinate label
-	drawTextWithBG("Z:",
-		-4, 4.6, 6, 0.5, true);
-
-	// Draw text box for x scale label
-	drawTextWithBG("Scale X:",
-		-3, 4.1, 8, 0.5, true);
-
-	// Draw text box for y scale label
-	drawTextWithBG("Scale Y:",
-		-3, 3.6, 8, 0.5, true);
-
-	// Draw text box for show player colliders toggle
-	drawTextWithBG("Collison:",
-		-4, 3.1, 6, 0.5, true);
-
-	// Draw text box for show player gravity toggle
-	drawTextWithBG("Gravity:",
-		-4, 2.6, 6, 0.5, true);
-
 	// Draw the text box
-	textInputX.draw();
-	textInputY.draw();
-	textInputZ.draw();
-	textInputScaleX.draw();
-	textInputScaleY.draw();
-
-	toggleButton1.drawToggleButton();
-	toggleButton2.drawToggleButton();
+	textInput.draw();
 
 	glPopMatrix();
 }
@@ -1097,11 +942,7 @@ void specialKeyboardRelease(int key, int x, int y) {
 void Keyboard(unsigned char key, int x, int y)
 {
 	// Handle key press events for input boxes
-	textInputX.handleKeyPress(key);
-	textInputY.handleKeyPress(key);
-	textInputZ.handleKeyPress(key);
-	textInputScaleX.handleKeyPress(key);
-	textInputScaleY.handleKeyPress(key);
+	textInput.handleKeyPress(key);
 
 	switch (key)
 	{
@@ -1200,6 +1041,7 @@ void MouseControl(int button, int state, int x, int y) {
 				}
 			}
 
+			// Check if any button was clicked
 			for (auto& button : topPanelButtons) {
 				if (button.isInside(x, y)) {
 					button.handleClick(); // Trigger the action associated with the button
@@ -1207,14 +1049,8 @@ void MouseControl(int button, int state, int x, int y) {
 				}
 			}
 
+			// Check if any button was clicked
 			for (auto& button : bottomPanelButtons) {
-				if (button.isInside(x, y)) {
-					button.handleClick(); // Trigger the action associated with the button
-					break; // Exit the loop after handling the click for one button
-				}
-			}
-
-			for (auto& button : rightPanelButtons) {
 				if (button.isInside(x, y)) {
 					button.handleClick(); // Trigger the action associated with the button
 					break; // Exit the loop after handling the click for one button
@@ -1229,54 +1065,18 @@ void MouseControl(int button, int state, int x, int y) {
 
 	// Check if clicked in or out of text box to set as active or not.
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		if (textInputX.isInside(x, y)) {
-			textInputX.setActive(true);
-			textInputType = 0;
+		if (textInput.isInside(x, y)) {
+			textInput.setActive(true);
 		}
 
 		else {
-			textInputX.setActive(false);
+			textInput.setActive(false);
 		}
-
-		if (textInputY.isInside(x, y)) {
-			textInputY.setActive(true);
-			textInputType = 1;
-		}
-
-		else {
-			textInputY.setActive(false);
-		}
-
-		if (textInputZ.isInside(x, y)) {
-			textInputZ.setActive(true);
-			textInputType = 2;
-		}
-
-		else {
-			textInputZ.setActive(false);
-		}
-
-		if (textInputScaleX.isInside(x, y)) {
-			textInputScaleX.setActive(true);
-			textInputType = 3;
-		}
-
-		else {
-			textInputScaleX.setActive(false);
-		}
-
-		if (textInputScaleY.isInside(x, y)) {
-			textInputScaleY.setActive(true);
-			textInputType = 4;
-		}
-
-		else {
-			textInputScaleY.setActive(false);
-		}
-
 	}
+
 	glutPostRedisplay();
 }
+
 
 void loadTextures() {
 	int i;
