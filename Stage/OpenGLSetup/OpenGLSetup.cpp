@@ -15,6 +15,7 @@
 #include <fstream>
 #include <functional>
 #include <string>
+#include <vector>
 #include <IrrKlang/irrKlang.h>
 
 using namespace irrklang;
@@ -65,6 +66,8 @@ static int timeLeft = 60;
 bool gridMode = true;
 bool displaySceneStateDisplay = true;
 bool showFileMenu = false;
+bool showSaveSubmenu = false;
+bool showLoadSubmenu = false;
 bool showHelpMenu = false;
 bool scrolling = false;
 
@@ -92,6 +95,13 @@ enum Scenes
 	EditScene
 };
 Scenes currentScene = EditScene;
+
+const int MAX_SCENES = 10;
+int currentSceneIndex = 0;
+vector<string> sceneFiles;
+vector<pair<float, float>> sceneStartPos;
+
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 enum PlayerState
 {
@@ -771,7 +781,7 @@ void buttonAddCollectable(Button& button)
 	collectableCount++;
 	GameObject collectible;
 	collectible.colorG = 0;
-	collectible.textureIndex = 18;   // uses your coffee sprites
+	collectible.textureIndex = 18;   // Coffee Sprite
 	collectible.canSee = true;
 	collectible.isSolid = true;
 	collectible.gravity = false;
@@ -782,7 +792,7 @@ void buttonAddCollectable(Button& button)
 		100, leftPanelButtons.back().windowY + 30, 200, 20,
 		hierarchyButton, "Collectable " + to_string(collectableCount), &collectibles.back());
 
-	printf("Completed action add collectable\n");
+	printf("Added Collectable\n");
 }
 
 void buttonAddHazard(Button& button) 
@@ -803,7 +813,7 @@ void buttonAddHazard(Button& button)
 		100, leftPanelButtons.back().windowY + 30, 200, 20,
 		hierarchyButton, "Hazard " + to_string(hazardCount), &hazards.back());
 
-	printf("Completed action add hazard\n");
+	printf("Added Hazard\n");
 }
 
 void buttonAddExit(Button& button) 
@@ -828,6 +838,10 @@ void buttonAddExit(Button& button)
 
 void buttonAddPlayer(Button& button)
 {
+	if (playerActive) {
+		std::cout << "Player already present\n";
+		return;
+	}
 	playerCount++;
 	Player = GameObject();         
 	Player.sizeX = 1.0f;
@@ -1390,15 +1404,35 @@ void topbarLogic()
 { 
 	glPushMatrix();
 	drawTextWithBG("File", 0.0f, 3.9f, 14.0f, 0.4f, false);
-		if (showFileMenu) 
-		{
-			drawSquare(1.85f, 10.0f, 1, -3.35f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
-			// Menu Entries
-			drawTextWithBG("Save", 1.2f, -2.0f, 14.0f, 0.4f, false);
-			drawTextWithBG("Load", 0.6f, -2.0f, 14.0f, 0.4f, false);
-			drawTextWithBG("Quit", 0.0f, -2.0f, 14.0f, 0.4f, false);
+	if (showFileMenu)
+	{
+		drawSquare(1.85f, 10.0f, 1, -3.30f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+		// Menu Entries
+		drawTextWithBG("Save", 1.2f, -2.0f, 14.0f, 0.4f, false);
+		drawTextWithBG("Load", 0.6f, -2.0f, 14.0f, 0.4f, false);
+		drawTextWithBG("Quit", 0.0f, -2.0f, 14.0f, 0.4f, false);
 
+	}
+	else if (showSaveSubmenu)
+	{
+
+		for (int i = 1; i <= 10; ++i)
+		{
+			float y = -0.2f - (i - 1) * 0.4f;
+			drawTextWithBG("Save Slot " + std::to_string(i), 1.2f, y, 14.0f, 0.4f, false);
 		}
+	}
+	else if (showLoadSubmenu) 
+	{
+		
+		for (int i = 1; i <= 10; ++i) 
+		{
+			float y = -0.2f - (i - 1) * 0.4f;
+			drawTextWithBG("Load Slot " + std::to_string(i), 1.2f, y, 14.0f, 0.4f, false);
+		}
+		
+	}
+
 	glPopMatrix();
 
 	glPushMatrix();
@@ -1741,9 +1775,15 @@ void MyDisplay()
 
 // Saving and Loading Scenes
 
-void saveGameObjects(const std::string& filename, const std::list<GameObject>& objects) {
-	std::ofstream out("save/" + filename + ".txt", std::ios::out | std::ios::trunc);
-	if (!out) { std::cerr << "Failed opening save/" << filename << ".txt\n"; return; }
+void saveGameObjects(const std::string& slot, const std::string& baseName, const std::list<GameObject>& objects)
+{
+	// Create Slot
+	std::string path = "save/" + slot + "/" + baseName + ".txt";
+	std::ofstream out(path, std::ios::out | std::ios::trunc);
+	if (!out) {
+		std::cerr << "Failed opening " << path << "\n";
+		return;
+	}
 	out << objects.size() << "\n";
 	for (auto& o : objects) {
 		out
@@ -1758,9 +1798,16 @@ void saveGameObjects(const std::string& filename, const std::list<GameObject>& o
 	}
 }
 
-void loadGameObjects(const std::string& filename, std::list<GameObject>& objects) {
-	std::ifstream in("save/" + filename + ".txt");
-	if (!in) { std::cerr << "Failed opening save/" << filename << ".txt\n"; return; }
+void loadGameObjects(const std::string& slot,
+	const std::string& baseName,
+	std::list<GameObject>& objects)
+{
+	std::string path = "save/" + slot + "/" + baseName + ".txt";
+	std::ifstream in(path);
+	if (!in) {
+		std::cerr << "Failed opening " << path << "\n";
+		return;
+	}
 	objects.clear();
 	size_t count;
 	in >> count;
@@ -1778,9 +1825,116 @@ void loadGameObjects(const std::string& filename, std::list<GameObject>& objects
 	}
 }
 
+void SaveSlot(int n) {
+	std::string slot = "Slot" + std::to_string(n);
+	saveGameObjects(slot, "platforms", platforms);
+	saveGameObjects(slot, "collectibles", collectibles);
+	saveGameObjects(slot, "hazards", hazards);
+	saveGameObjects(slot, "exits", exits);
+	if (playerActive) {
+		std::list<GameObject> tmp{ Player };
+		saveGameObjects(slot, "player", tmp);
+	}
+	std::cout << "Saved to " << slot << "\n";
+}
 
+void LoadSlot(int n) 
+{
+	std::string slot = "Slot" + std::to_string(n);
+	loadGameObjects(slot, "platforms", platforms);
+	loadGameObjects(slot, "collectibles", collectibles);
+	loadGameObjects(slot, "hazards", hazards);
+	loadGameObjects(slot, "exits", exits);
 
+	// 2) Clear out the old hierarchy buttons
+	//    (but maybe keep your “Scene 1” button at index 0)
+	Button sceneBtn = leftPanelButtons.front();
+	leftPanelButtons.clear();
+	leftPanelButtons.push_back(sceneBtn);
 
+	// 3) Re-create one button per platform
+	int idx = 1;
+	for (auto& plat : platforms) {
+		Button::addToList(
+			leftPanelButtons,
+			/*x*/0, /*y*/ leftPanelButtons.back().y - 0.7f,
+			/*w*/14, /*h*/0.5f,
+			/*winX*/100, /*winY*/ leftPanelButtons.back().windowY + 30,
+			/*winW*/200, /*winH*/20,
+			hierarchyButton,
+			"Platform " + to_string(idx++),
+			&plat
+		);
+	}
+
+	// 4) Re-create one button per collectible
+	idx = 1;
+	for (auto& c : collectibles) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Collectable " + to_string(idx++),
+			&c
+		);
+	}
+
+	// 5) Hazards
+	idx = 1;
+	for (auto& h : hazards) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Hazard " + to_string(idx++),
+			&h
+		);
+	}
+
+	// 6) Exits
+	idx = 1;
+	for (auto& e : exits) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Exit " + to_string(idx++),
+			&e
+		);
+	}
+
+	// 7) Finally, restore the player
+	std::list<GameObject> tmp;
+	loadGameObjects(slot, "player", tmp);
+	if (!tmp.empty()) {
+		Player = tmp.front();
+		playerActive = true;
+
+		// Add the one Player button (only if not already there)
+		bool hasPlayer =
+			std::find_if(
+				leftPanelButtons.begin(),
+				leftPanelButtons.end(),
+				[](const Button& b) { return b.text == "Player"; }
+			) != leftPanelButtons.end();
+	
+		if (!hasPlayer) {
+			Button::addToList(
+				leftPanelButtons,
+				0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+				100, leftPanelButtons.back().windowY + 30, 200, 20,
+				hierarchyButton,
+				"Player",
+				&Player
+			);
+		}
+	}
+
+	std::cout << "Scene loaded and hierarchy rebuilt.\n";
+}
 
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1983,50 +2137,78 @@ void MouseControl(int button, int state, int x, int y) {
 			// File Menu Open
 			if (showFileMenu) 
 			{
-				if (x >= 70 && x < 150 && y >= 25 && y <= 70) {
-					// call save routines
-					saveGameObjects("platforms", platforms);
-					saveGameObjects("collectibles", collectibles);
-					saveGameObjects("hazards", hazards);
-					saveGameObjects("exits", exits);
-					if (playerActive) {
-						std::list<GameObject> tmp{ Player };
-						saveGameObjects("player", tmp);
-					}
-					std::cout << "Scene saved.\n";
+				if (x >= 95 && x < 150 && y >= 25 && y <= 70) 
+				{
 					showFileMenu = false;
+					showSaveSubmenu = true;
 					return;
 				}
-
 
 				// LOAD
-				if (x >= 35 && x < 60 && y >= 25 && y <= 70) {
-					loadGameObjects("platforms", platforms);
-					loadGameObjects("collectibles", collectibles);
-					loadGameObjects("hazards", hazards);
-					loadGameObjects("exits", exits);
-					{
-						std::list<GameObject> tmp;
-						loadGameObjects("player", tmp);
-						if (!tmp.empty()) Player = tmp.front();
-					}
-					std::cout << "Scene loaded.\n";
+				if (x >= 50 && x < 80 && y >= 25 && y <= 70) 
+				{
 					showFileMenu = false;
+					showLoadSubmenu = true;
 					return;
 				}
 
-
 				// Quit area
-				if (x >= 5 && x <= 30 && y >= 25 && y <= 70)
+				if (x >= 5.0f && x <= 30.0f && y >= 25.0f && y <= 70.0f)
 				{
 					std::cout << "Quit selected, exiting.\n";
 					exit(0);
 				}
 
-
 				showFileMenu = false;
 				return;
 			}
+
+			if (showSaveSubmenu) {
+				// assume each slot line is 30px tall starting at window-Y of 70
+				for (int i = 1; i <= 10; ++i) {
+					float topY = 70 + (i - 1) * 30;
+					float botY = topY - 30;
+					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
+						SaveSlot(i);
+						showSaveSubmenu = false;
+						return;
+					}
+				}
+				// clicked outside, close submenu
+				showSaveSubmenu = false;
+				return;
+			}
+
+			// 3) Load-slot submenu
+			if (showLoadSubmenu) {
+				for (int i = 1; i <= 10; ++i) {
+					float topY = 70 + (i - 1) * 30;
+					float botY = topY - 30;
+					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
+						LoadSlot(i);
+						showLoadSubmenu = false;
+						return;
+					}
+				}
+				showLoadSubmenu = false;
+				return;
+			}
+
+			if (showLoadSubmenu) {
+				for (int i = 1; i <= 10; ++i) {
+					float topY = 70 + (i - 1) * 30;
+					float botY = topY - 30;
+					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
+						LoadSlot(i);
+						showLoadSubmenu = false;
+						return;
+					}
+				}
+				showLoadSubmenu = false;
+				return;
+			}
+
+
 
 			// Help Menu Open
 			if (showHelpMenu) {
