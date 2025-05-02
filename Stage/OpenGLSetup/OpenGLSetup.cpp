@@ -60,6 +60,7 @@ bool playerActive = false;
 int totalcoffee = 10;					// Collectibles (Total)
 int coffeeCollected = 0;				// Collectibles (Gathered)
 static int timeLeft = 60;
+int loop = 0;
 
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -92,7 +93,7 @@ enum Scenes
 	LoseScene,
 	WinScene,
 	PauseScene,
-	EditScene
+	EditScene,
 };
 Scenes currentScene = EditScene;
 
@@ -294,6 +295,15 @@ void playJumpSFX()
 	}
 }
 
+void playTrack1()
+{
+	if (buttonDebug == false)
+	{
+		SoundEngine->stopAllSounds();
+		SoundEngine->play2D("audio/01 Green And Amber Herb.mp3", true);
+	}
+}
+
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Gameobject Class
 class GameObject
@@ -463,6 +473,7 @@ void handleCollision(GameObject* A, GameObject* B)
 		GameObject* col = (A == &Player ? B : A);
 		col->destroyed = true;
 		++coffeeCollected;
+		//LoadSlot(4);
 		return;
 	}
 	// Hazards
@@ -495,7 +506,7 @@ void handleCollision(GameObject* A, GameObject* B)
 			[&](auto& e) { return &e == A; }) != exits.end()))
 	{
 		// only trigger win if you've collected them all
-		if (coffeeCollected == totalcoffee) {
+		if (coffeeCollected == totalcoffee && loop == 10) {
 			currentScene = WinScene;
 			playWinMusic();
 		}
@@ -869,6 +880,31 @@ void buttonAddPlayer(Button& button)
 	playerActive = true;
 }
 
+
+void worldModifier(int loop) {
+	static int lastLoop = -1;
+	if (loop != lastLoop) 
+	{
+		// loop just changed
+		switch (loop) 
+		{
+		case 1:  std::cout << "Hi\n";                 break;
+		case 2:  playTrack1();                        break;
+		case 3:  displaySceneStateDisplay = false;    break;
+		case 4:  std::cout << "Please\n";                 break;
+		case 5:  playTrack1();                        break;
+		case 6:  displaySceneStateDisplay = false;    break;
+		case 7:  std::cout << "Stop\n";                 break;
+		case 8:  playTrack1();                        break;
+		case 9:  displaySceneStateDisplay = false;    break;
+		case 10:  std::cout << "Hi\n";                break;
+		}
+		lastLoop = loop;
+	}
+}
+
+
+
 // -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 void init(void) 
@@ -886,7 +922,7 @@ void init(void)
  
 
 	// Left Panel Buttons (Since I removed the player button) 
-	Button sceneButton(0.0f, 6.0f, 14.0f, 0.5f, 100, 92, 200, 20, nullptr, "Scene 1", nullptr ); // Plan to make multiple scenes in next iteration
+	Button sceneButton(0.0f, 6.0f, 14.0f, 0.5f, 100, 92, 200, 20, nullptr, "My World", nullptr ); // Plan to make multiple scenes in next iteration
 	leftPanelButtons.push_back(sceneButton);
 
 	// Bottom buttons
@@ -1104,6 +1140,179 @@ bool CheckCollision(GameObject& one, GameObject& two) // AABB - AABB collision
 	return collisionX && collisionY;
 }
 
+// Saving and Loading Scenes
+
+void saveGameObjects(const std::string& slot, const std::string& baseName, const std::list<GameObject>& objects)
+{
+	// Create Slot
+	std::string path = "save/" + slot + "/" + baseName + ".txt";
+	std::ofstream out(path, std::ios::out | std::ios::trunc);
+	if (!out) {
+		std::cerr << "Failed opening " << path << "\n";
+		return;
+	}
+	out << objects.size() << "\n";
+	for (auto& o : objects) {
+		out
+			<< o.x << ' ' << o.y << ' ' << o.z << ' '
+			<< o.sizeX << ' ' << o.sizeY << ' '
+			<< o.colorR << ' ' << o.colorG << ' ' << o.colorB << ' '
+			<< o.mass << ' '
+			<< o.canSee << ' ' << o.isSolid << ' '
+			<< o.destroyed << ' ' << o.gravity << ' '
+			<< o.textureIndex
+			<< "\n";
+	}
+}
+
+void loadGameObjects(const std::string& slot,
+	const std::string& baseName,
+	std::list<GameObject>& objects)
+{
+	std::string path = "save/" + slot + "/" + baseName + ".txt";
+	std::ifstream in(path);
+	if (!in) {
+		std::cerr << "Failed opening " << path << "\n";
+		return;
+	}
+	objects.clear();
+	size_t count;
+	in >> count;
+	for (size_t i = 0; i < count; ++i) {
+		GameObject o;
+		in
+			>> o.x >> o.y >> o.z
+			>> o.sizeX >> o.sizeY
+			>> o.colorR >> o.colorG >> o.colorB
+			>> o.mass
+			>> o.canSee >> o.isSolid
+			>> o.destroyed >> o.gravity
+			>> o.textureIndex;
+		objects.push_back(o);
+	}
+}
+
+void SaveSlot(int n) {
+	std::string slot = "Slot" + std::to_string(n);
+	saveGameObjects(slot, "platforms", platforms);
+	saveGameObjects(slot, "collectibles", collectibles);
+	saveGameObjects(slot, "hazards", hazards);
+	saveGameObjects(slot, "exits", exits);
+	if (playerActive) {
+		std::list<GameObject> tmp{ Player };
+		saveGameObjects(slot, "player", tmp);
+	}
+	std::cout << "Saved to " << slot << "\n";
+}
+
+void LoadSlot(int n) 
+{
+	std::string slot = "Slot" + std::to_string(n);
+	loadGameObjects(slot, "platforms", platforms);
+	loadGameObjects(slot, "collectibles", collectibles);
+	loadGameObjects(slot, "hazards", hazards);
+	loadGameObjects(slot, "exits", exits);
+
+	// 2) Clear out the old hierarchy buttons
+	//    (but maybe keep your “Scene 1” button at index 0)
+	Button sceneBtn = leftPanelButtons.front();
+	leftPanelButtons.clear();
+	leftPanelButtons.push_back(sceneBtn);
+
+	// 3) Re-create one button per platform
+	int idx = 1;
+	for (auto& plat : platforms) {
+		Button::addToList(
+			leftPanelButtons,
+			/*x*/0, /*y*/ leftPanelButtons.back().y - 0.7f,
+			/*w*/14, /*h*/0.5f,
+			/*winX*/100, /*winY*/ leftPanelButtons.back().windowY + 30,
+			/*winW*/200, /*winH*/20,
+			hierarchyButton,
+			"Ground " + to_string(idx++),
+			&plat
+		);
+	}
+
+	// 4) Re-create one button per collectible
+	idx = 1;
+	for (auto& c : collectibles) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Collectable " + to_string(idx++),
+			&c
+		);
+	}
+
+	// 5) Hazards
+	idx = 1;
+	for (auto& h : hazards) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Hazard " + to_string(idx++),
+			&h
+		);
+	}
+
+	// 6) Exits
+	idx = 1;
+	for (auto& e : exits) {
+		Button::addToList(
+			leftPanelButtons,
+			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+			100, leftPanelButtons.back().windowY + 30, 200, 20,
+			hierarchyButton,
+			"Exit " + to_string(idx++),
+			&e
+		);
+	}
+
+	// 7) Finally, restore the player
+	std::list<GameObject> tmp;
+	loadGameObjects(slot, "player", tmp);
+	if (!tmp.empty()) {
+		Player = tmp.front();
+		playerActive = true;
+
+		// Add the one Player button (only if not already there)
+		bool hasPlayer =
+			std::find_if(
+				leftPanelButtons.begin(),
+				leftPanelButtons.end(),
+				[](const Button& b) { return b.text == "Player"; }
+			) != leftPanelButtons.end();
+	
+		if (!hasPlayer) {
+			Button::addToList(
+				leftPanelButtons,
+				0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
+				100, leftPanelButtons.back().windowY + 30, 200, 20,
+				hierarchyButton,
+				"Player",
+				&Player
+			);
+		}
+	}
+
+	groundCount = platforms.size();
+	collectableCount = collectibles.size();
+	hazardCount = hazards.size();
+	exitCount = exits.size();
+	playerCount = playerActive ? 1 : 0;
+
+	std::cout << "Scene loaded and hierarchy rebuilt.\n";
+}
+
+
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 // Updated to match the new list for all the ground platforms
 void gravityCheck()
@@ -1228,6 +1437,14 @@ void detectAllCollisions() {
 				{
 					c.destroyed = true;
 					coffeeCollected++;
+					
+					if (coffeeCollected == 11)
+					{
+						coffeeCollected = 0;
+						loop++;
+						LoadSlot(loop);
+					}
+					break;
 				}
 			}
 
@@ -1245,8 +1462,11 @@ void detectAllCollisions() {
 				for (auto& e : exits) {
 					if (CheckCollision(Player, e)) 
 					{
-						currentScene = WinScene;
-						playWinMusic();
+						if (loop == totalcoffee)
+						{
+							currentScene = WinScene;
+							playWinMusic();
+						}
 					}
 				}
 			}
@@ -1412,28 +1632,33 @@ void topbarLogic()
 		drawTextWithBG("Load", 0.6f, -2.0f, 14.0f, 0.4f, false);
 		drawTextWithBG("Quit", 0.0f, -2.0f, 14.0f, 0.4f, false);
 
-	}
-	else if (showSaveSubmenu)
-	{
 
-		for (int i = 1; i <= 10; ++i)
+		if (showSaveSubmenu)
 		{
-			float y = -0.2f - (i - 1) * 0.4f;
-			drawTextWithBG("Save Slot " + std::to_string(i), 1.2f, y, 14.0f, 0.4f, false);
+			drawSquare(10.0f, 10.0f, 1.0f, -0.3f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawTextWithBG("Save File:", 0.0f, -2.0f, 14.0f, 0.4f, false);
+
+			for (int i = 1; i <= 10; ++i)
+			{
+				float x = 1.0f + (i - 1) * 0.8f;
+				drawTextWithBG("Slot: " + to_string(i), x, -2.0f, 14.0f, 0.4f, false);
+			}
+		}
+
+		if (showLoadSubmenu)
+		{
+			drawSquare(10.0f, 10.0f, 1.0f, -0.3f, -0.2f, 0.0f,  /* Red */ 46.0f / 255.0f, /* Green */ 32.0f / 255.0f, /* Blue */ 43.0f / 255.0f);
+			drawTextWithBG("Load File:", 0.0f, -2.0f, 14.0f, 0.4f, false);
+
+			for (int i = 1; i <= 10; ++i)
+			{
+				float x = 1.0f + (i - 1) * 0.8f;
+				drawTextWithBG("Slot: " + to_string(i), x, -2.0f, 14.0f, 0.4f, false);
+			}
 		}
 	}
-	else if (showLoadSubmenu) 
-	{
-		
-		for (int i = 1; i <= 10; ++i) 
-		{
-			float y = -0.2f - (i - 1) * 0.4f;
-			drawTextWithBG("Load Slot " + std::to_string(i), 1.2f, y, 14.0f, 0.4f, false);
-		}
-		
-	}
-
 	glPopMatrix();
+
 
 	glPushMatrix();
 	drawTextWithBG("Help", 0.5f, 3.9f, 14.0f, 0.4f, false);
@@ -1497,6 +1722,9 @@ void ActiveGame()
 		Player.x -= speed;
 	if (rt)
 		Player.x += speed;
+
+	worldModifier(loop);
+
 	glPopMatrix();
 }
 
@@ -1773,171 +2001,6 @@ void MyDisplay()
 
 // -----------------------------------------------------------------------------------------
 
-// Saving and Loading Scenes
-
-void saveGameObjects(const std::string& slot, const std::string& baseName, const std::list<GameObject>& objects)
-{
-	// Create Slot
-	std::string path = "save/" + slot + "/" + baseName + ".txt";
-	std::ofstream out(path, std::ios::out | std::ios::trunc);
-	if (!out) {
-		std::cerr << "Failed opening " << path << "\n";
-		return;
-	}
-	out << objects.size() << "\n";
-	for (auto& o : objects) {
-		out
-			<< o.x << ' ' << o.y << ' ' << o.z << ' '
-			<< o.sizeX << ' ' << o.sizeY << ' '
-			<< o.colorR << ' ' << o.colorG << ' ' << o.colorB << ' '
-			<< o.mass << ' '
-			<< o.canSee << ' ' << o.isSolid << ' '
-			<< o.destroyed << ' ' << o.gravity << ' '
-			<< o.textureIndex
-			<< "\n";
-	}
-}
-
-void loadGameObjects(const std::string& slot,
-	const std::string& baseName,
-	std::list<GameObject>& objects)
-{
-	std::string path = "save/" + slot + "/" + baseName + ".txt";
-	std::ifstream in(path);
-	if (!in) {
-		std::cerr << "Failed opening " << path << "\n";
-		return;
-	}
-	objects.clear();
-	size_t count;
-	in >> count;
-	for (size_t i = 0; i < count; ++i) {
-		GameObject o;
-		in
-			>> o.x >> o.y >> o.z
-			>> o.sizeX >> o.sizeY
-			>> o.colorR >> o.colorG >> o.colorB
-			>> o.mass
-			>> o.canSee >> o.isSolid
-			>> o.destroyed >> o.gravity
-			>> o.textureIndex;
-		objects.push_back(o);
-	}
-}
-
-void SaveSlot(int n) {
-	std::string slot = "Slot" + std::to_string(n);
-	saveGameObjects(slot, "platforms", platforms);
-	saveGameObjects(slot, "collectibles", collectibles);
-	saveGameObjects(slot, "hazards", hazards);
-	saveGameObjects(slot, "exits", exits);
-	if (playerActive) {
-		std::list<GameObject> tmp{ Player };
-		saveGameObjects(slot, "player", tmp);
-	}
-	std::cout << "Saved to " << slot << "\n";
-}
-
-void LoadSlot(int n) 
-{
-	std::string slot = "Slot" + std::to_string(n);
-	loadGameObjects(slot, "platforms", platforms);
-	loadGameObjects(slot, "collectibles", collectibles);
-	loadGameObjects(slot, "hazards", hazards);
-	loadGameObjects(slot, "exits", exits);
-
-	// 2) Clear out the old hierarchy buttons
-	//    (but maybe keep your “Scene 1” button at index 0)
-	Button sceneBtn = leftPanelButtons.front();
-	leftPanelButtons.clear();
-	leftPanelButtons.push_back(sceneBtn);
-
-	// 3) Re-create one button per platform
-	int idx = 1;
-	for (auto& plat : platforms) {
-		Button::addToList(
-			leftPanelButtons,
-			/*x*/0, /*y*/ leftPanelButtons.back().y - 0.7f,
-			/*w*/14, /*h*/0.5f,
-			/*winX*/100, /*winY*/ leftPanelButtons.back().windowY + 30,
-			/*winW*/200, /*winH*/20,
-			hierarchyButton,
-			"Platform " + to_string(idx++),
-			&plat
-		);
-	}
-
-	// 4) Re-create one button per collectible
-	idx = 1;
-	for (auto& c : collectibles) {
-		Button::addToList(
-			leftPanelButtons,
-			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
-			100, leftPanelButtons.back().windowY + 30, 200, 20,
-			hierarchyButton,
-			"Collectable " + to_string(idx++),
-			&c
-		);
-	}
-
-	// 5) Hazards
-	idx = 1;
-	for (auto& h : hazards) {
-		Button::addToList(
-			leftPanelButtons,
-			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
-			100, leftPanelButtons.back().windowY + 30, 200, 20,
-			hierarchyButton,
-			"Hazard " + to_string(idx++),
-			&h
-		);
-	}
-
-	// 6) Exits
-	idx = 1;
-	for (auto& e : exits) {
-		Button::addToList(
-			leftPanelButtons,
-			0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
-			100, leftPanelButtons.back().windowY + 30, 200, 20,
-			hierarchyButton,
-			"Exit " + to_string(idx++),
-			&e
-		);
-	}
-
-	// 7) Finally, restore the player
-	std::list<GameObject> tmp;
-	loadGameObjects(slot, "player", tmp);
-	if (!tmp.empty()) {
-		Player = tmp.front();
-		playerActive = true;
-
-		// Add the one Player button (only if not already there)
-		bool hasPlayer =
-			std::find_if(
-				leftPanelButtons.begin(),
-				leftPanelButtons.end(),
-				[](const Button& b) { return b.text == "Player"; }
-			) != leftPanelButtons.end();
-	
-		if (!hasPlayer) {
-			Button::addToList(
-				leftPanelButtons,
-				0, leftPanelButtons.back().y - 0.7f, 14, 0.5f,
-				100, leftPanelButtons.back().windowY + 30, 200, 20,
-				hierarchyButton,
-				"Player",
-				&Player
-			);
-		}
-	}
-
-	std::cout << "Scene loaded and hierarchy rebuilt.\n";
-}
-
-
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Controls
 void specialKeyboard(int key, int x, int y)
@@ -2026,8 +2089,9 @@ void Keyboard(unsigned char key, int x, int y)
 	case 'g':
 		if (currentScene == MenuScene)
 		{
+			LoadSlot(1);
 			currentScene = GameScene;
-			playGameMusic();
+			//playGameMusic();
 		}
 		break;
 	case 'p': // Toggle Pause while in game 
@@ -2055,7 +2119,7 @@ void Keyboard(unsigned char key, int x, int y)
 		else if (currentScene == EditScene)
 		{
 			currentScene = MenuScene;
-			playMenuMusic();
+			//playMenuMusic();
 		}
 		break;
 
@@ -2107,13 +2171,20 @@ void MouseControl(int button, int state, int x, int y) {
 		cout << "\nClicked in " << clickedPanel << " at window coordinates (" << x << ", " << y << ")" << endl;
 
 		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		if (clickedPanel == "Left Panel")
-		{
-			// Check if any button was clicked
+		if (clickedPanel == "Left Panel") {
+
+			const float WORLD_HEIGHT = 14.0f;
+			const int   VIEWPORT_PIX_H = MIDDLE_PANEL_H;      // 600
+			float       pixelsPerUnit = VIEWPORT_PIX_H / WORLD_HEIGHT;
+			int         scrollPixels = int(hierarchyScrollY * pixelsPerUnit);
+
+
+			int adjustedY = y + scrollPixels;
+
 			for (auto& button : leftPanelButtons) {
-				if (button.isInside(x, y)) {
-					button.handleClick();				// Trigger the action associated with the button
-					break;								// Exit the loop after handling the click for one button
+				if (button.isInside(x, adjustedY)) {
+					button.handleClick();
+					break;
 				}
 			}
 		}
@@ -2137,23 +2208,63 @@ void MouseControl(int button, int state, int x, int y) {
 			// File Menu Open
 			if (showFileMenu) 
 			{
-				if (x >= 95 && x < 150 && y >= 25 && y <= 70) 
+
+				// Save area
+				if (x >= 95 && x < 150 && y >= 25 && y <= 70 && !showSaveSubmenu && !showLoadSubmenu)
 				{
-					showFileMenu = false;
+					std::cout << "Displaying Submenu Save Slots.\n";
 					showSaveSubmenu = true;
+					showLoadSubmenu = false;
 					return;
 				}
 
-				// LOAD
-				if (x >= 50 && x < 80 && y >= 25 && y <= 70) 
+				// If I have the time to fix this to be accurate and automated, I will change it.
+				// Save Submenu
+				if (showSaveSubmenu && !showLoadSubmenu)
 				{
-					showFileMenu = false;
+					for (int i = 1; i <= 10; ++i)
+					{
+						int startX = 75 + (i - 1) * 60;
+						int endX = startX + 35;
+						if (x >= startX && x < endX && y >= 25 && y <= 70) {
+							SaveSlot(i);
+							std::cout << "Clicked: Slot " << i << "\n";
+							break;
+						}
+					}
+					showSaveSubmenu = false;
+					return;
+				}
+
+
+				// Load area
+				if (x >= 50 && x < 80 && y >= 25 && y <= 70 && !showSaveSubmenu && !showLoadSubmenu)
+				{
+					std::cout << "Displaying Submenu Load Slots.\n";
 					showLoadSubmenu = true;
+					showSaveSubmenu = false;
+					return;
+				}
+
+				// Load Submenu
+				if (showLoadSubmenu && !showSaveSubmenu)
+				{
+					for (int i = 1; i <= 10; ++i)
+					{
+						int startX = 75 + (i - 1) * 60;
+						int endX = startX + 35;
+						if (x >= startX && x < endX && y >= 25 && y <= 70) {
+							LoadSlot(i);
+							std::cout << "Clicked: Slot " << i << "\n";
+							break;
+						}
+					}
+					showLoadSubmenu = false;
 					return;
 				}
 
 				// Quit area
-				if (x >= 5.0f && x <= 30.0f && y >= 25.0f && y <= 70.0f)
+				if (x >= 5.0f && x <= 30.0f && y >= 25.0f && y <= 70.0f && !showSaveSubmenu && !showLoadSubmenu)
 				{
 					std::cout << "Quit selected, exiting.\n";
 					exit(0);
@@ -2162,53 +2273,6 @@ void MouseControl(int button, int state, int x, int y) {
 				showFileMenu = false;
 				return;
 			}
-
-			if (showSaveSubmenu) {
-				// assume each slot line is 30px tall starting at window-Y of 70
-				for (int i = 1; i <= 10; ++i) {
-					float topY = 70 + (i - 1) * 30;
-					float botY = topY - 30;
-					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
-						SaveSlot(i);
-						showSaveSubmenu = false;
-						return;
-					}
-				}
-				// clicked outside, close submenu
-				showSaveSubmenu = false;
-				return;
-			}
-
-			// 3) Load-slot submenu
-			if (showLoadSubmenu) {
-				for (int i = 1; i <= 10; ++i) {
-					float topY = 70 + (i - 1) * 30;
-					float botY = topY - 30;
-					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
-						LoadSlot(i);
-						showLoadSubmenu = false;
-						return;
-					}
-				}
-				showLoadSubmenu = false;
-				return;
-			}
-
-			if (showLoadSubmenu) {
-				for (int i = 1; i <= 10; ++i) {
-					float topY = 70 + (i - 1) * 30;
-					float botY = topY - 30;
-					if (x >= 95 && x < 300 && y >= botY && y <= topY) {
-						LoadSlot(i);
-						showLoadSubmenu = false;
-						return;
-					}
-				}
-				showLoadSubmenu = false;
-				return;
-			}
-
-
 
 			// Help Menu Open
 			if (showHelpMenu) {
